@@ -1,0 +1,7 @@
+{
+    "python.pythonPath": "d:\\mestrado\\repos\\transfomer\\.venv\\Scripts\\python.exe",
+    "python.dataScience.jupyterServerURI": "local",
+    "files.watcherExclude": {
+        "**/target": true
+    }
+}
