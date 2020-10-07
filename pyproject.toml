@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "transfomer"
+name = "sl-transfomer"
 version = "0.1.0"
 description = ""
 authors = ["Cleison Amorim <cca5@cin.ufpe.br>"]
