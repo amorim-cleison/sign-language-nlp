@@ -1,8 +1,17 @@
-import numpy as np
+# import numpy as np
 import torch
 from torch.autograd import Variable
-from model import (Batch, LabelSmoothing, make_model, run_epoch,
-                      subsequent_mask)
+from model import (LabelSmoothing, make_model, run_epoch)
+
+
+class SimpleLossCompute:
+    # FIXME: implement this
+    pass
+
+
+def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    # FIXME: implement this
+    pass
 
 
 def run(input_dir, **kwargs):
@@ -69,7 +78,7 @@ def load_data(input_dir):
 
     all_data = list()
     files = u.filter_files(input_dir, ext="json")
-    total = len(files)
+    # total = len(files)
 
     for idx, path in enumerate(files):
         # log(f" [{idx + 1} / {total}] Reading '{path}'...", 2)
