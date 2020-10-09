@@ -34,7 +34,8 @@ jobs:
 
     - name: Install dependencies
       run: |
-        poetry install
+        poetry update
+        # poetry install
 
     - name: Lint with flake8
       run: |
