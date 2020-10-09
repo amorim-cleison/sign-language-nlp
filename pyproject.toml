@@ -6,10 +6,12 @@ authors = ["Cleison Amorim <cca5@cin.ufpe.br>"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
+commons-python = { git = "https://github.com/amorim-cleison/commons-python.git", branch = "develop" }
+torch = { git = "https://github.com/pytorch/pytorch.git", tag = "v1.6.0" }
+torchvision = { git = "https://github.com/pytorch/vision.git", tag = "v0.7.0" }
 torchtext= "^0.6.0"
 spacy = "^2.3.2"
 seaborn = "^0.11.0"
-torchvision = "~0.7.0"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.8.3"
