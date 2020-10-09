@@ -1,4 +1,4 @@
-from IPython import get_ipython
+# from IPython import get_ipython
 # from IPython.display import Image
 # Image(filename='images/aiayn.png')
 

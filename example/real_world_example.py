@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from exported import Batch, LabelSmoothing, NoamOpt
 from exported import make_model, batch_size_fn, run_epoch
-from first_example import greedy_decode, SimpleLossCompute
+from .first_example import greedy_decode, SimpleLossCompute
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import seaborn
@@ -113,7 +113,7 @@ class MultiGPULossCompute:
         return total * normalize
 
 
-def run():
+def run(**kwargs):
     if True:
         import spacy
         spacy_de = spacy.load('de')
