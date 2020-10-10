@@ -395,21 +395,6 @@ future = "*"
 numpy = "*"
 
 [[package]]
-name = "torch"
-version = "1.6.0+cpu"
-description = "Tensors and Dynamic neural networks in Python with strong GPU acceleration"
-category = "main"
-optional = false
-python-versions = ">=3.6.1"
-
-[package.dependencies]
-future = "*"
-numpy = "*"
-
-[package.source]
-type = "url"
-url = "https://download.pytorch.org/whl/cpu/torch-1.6.0%2Bcpu-cp37-cp37m-win_amd64.whl"
-[[package]]
 name = "torchtext"
 version = "0.6.0"
 description = "Text utilities and datasets for PyTorch"
@@ -480,7 +465,7 @@ testing = ["pytest (>=3.5,<3.7.3 || >3.7.3)", "pytest-checkdocs (>=1.2.3)", "pyt
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "c0e91f7b1f45d9ada629676d6602478780632b55c2c2be4c68c5814861312282"
+content-hash = "533b17c36c720caed41995207acace801f3c0d324e0c317519f4fa003d1a195c"
 
 [metadata.files]
 blis = [
