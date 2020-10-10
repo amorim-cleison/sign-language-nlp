@@ -19,8 +19,7 @@ jobs:
     runs-on: ${{ matrix.os }}-latest
     strategy:
         matrix:
-          # os: [ubuntu, windows]
-          os: [Ubuntu]
+          os: [Ubuntu, Windows]
           python-version: [3.7]
           poetry-version: [1.1.2]
     steps:
