@@ -20,7 +20,7 @@ jobs:
     strategy:
         matrix:
           # os: [ubuntu, windows]
-          os: [ubuntu]
+          os: [Ubuntu]
           python-version: [3.7]
           poetry-version: [1.1.2]
     steps:
@@ -39,7 +39,7 @@ jobs:
 
     - name: Configure Poetry
       shell: bash
-      run: python -m poetry config virtualenvs.in-project true
+      run: poetry config virtualenvs.in-project true
 
     - name: Set up cache
       uses: actions/cache@v2
@@ -55,8 +55,8 @@ jobs:
 
     - name: Install dependencies
       shell: bash
-      run: python -m poetry install
+      run: poetry install
 
-    - name: Run tests
-      shell: bash
-      run: python -m poetry run python -m pytest -v tests
+    # - name: Run tests
+    #   shell: bash
+    #   run: poetry run python -m pytest -v tests
