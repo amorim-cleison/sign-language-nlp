@@ -2,15 +2,18 @@
 # from IPython.display import Image
 # Image(filename='images/aiayn.png')
 
-# !pip install http://download.pytorch.org/whl/cu80/torch-0.3.0.post4-cp36-cp36m-linux_x86_64.whl numpy matplotlib spacy torchtext seaborn
+# !pip install http://download.pytorch.org/whl/cu80/torch-0.3.0.post4-cp36-cp36m-linux_x86_64.whl numpy
+# matplotlib spacy torchtext seaborn
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math, copy, time
+import math
+import copy
+import time
 from torch.autograd import Variable
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import seaborn
 
 seaborn.set_context(context="talk")
@@ -197,8 +200,8 @@ class MultiHeadedAttention(nn.Module):
 
         # 1) Do all the linear projections in batch from d_model => h x d_k
         query, key, value = [
-            l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
-            for l, x in zip(self.linears, (query, key, value))
+            l_value(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
+            for l_value, x in zip(self.linears, (query, key, value))
         ]
 
         # 2) Apply attention on all the projected vectors in batch.
@@ -372,9 +375,8 @@ class NoamOpt:
         "Implement `lrate` above"
         if step is None:
             step = self._step
-        return self.factor * (self.model_size**
-                              (-0.5) * min(step**
-                                           (-0.5), step * self.warmup**(-1.5)))
+        return self.factor * (self.model_size**(-0.5) *
+                              min(step**(-0.5), step * self.warmup**(-1.5)))
 
 
 def get_std_opt(model):

@@ -2,7 +2,8 @@
 # from IPython.display import Image
 # Image(filename='images/aiayn.png')
 
-# !pip install http://download.pytorch.org/whl/cu80/torch-0.3.0.post4-cp36-cp36m-linux_x86_64.whl numpy matplotlib spacy torchtext seaborn
+# !pip install http://download.pytorch.org/whl/cu80/torch-0.3.0.post4-cp36-cp36m-linux_x86_64.whl numpy
+# matplotlib spacy torchtext seaborn
 
 import numpy as np
 import torch
@@ -19,7 +20,7 @@ http://nlp.seas.harvard.edu/2018/04/03/attention.html
 
 class EncoderDecoder(nn.Module):
     """
-    A standard Encoder-Decoder architecture. Base for this and many 
+    A standard Encoder-Decoder architecture. Base for this and many
     other models.
     """
 

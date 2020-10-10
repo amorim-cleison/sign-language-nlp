@@ -173,8 +173,8 @@ def data_gen(input_dir):
 
     new_jsons = [transform(json) for json in jsons]
 
-    V, batch, nbatches = 11, 30, 20
-
+    # V, batch, nbatches = 11, 30, 20
+    _, _, nbatches = 11, 30, 20
 
     for i in range(nbatches):
         # data = torch.from_numpy(np.random.randint(1, V, size=(batch, 10)))

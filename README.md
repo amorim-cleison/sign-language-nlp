@@ -1,6 +1,7 @@
 # sl-transformer
 
-![Build](https://github.com/amorim-cleison/sl-transformer/workflows/Build/badge.svg?branch=develop)
+![Build](https://github.com/amorim-cleison/sl-transformer/workflows/Build/badge.svg)
+![Code Quality](https://github.com/amorim-cleison/sl-transformer/workflows/Code%20Quality/badge.svg)
 
 ## Initialization
 To initialize project and install dependencies, you need run:

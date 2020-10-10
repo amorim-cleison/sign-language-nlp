@@ -92,14 +92,14 @@ class MultiGPULossCompute:
             loss = nn.parallel.parallel_apply(self.criterion, y)
 
             # Sum and normalize loss
-            l = nn.parallel.gather(loss, target_device=self.devices[0])
-            l = l.sum()[0] / normalize
-            total += l.data[0]
+            l_value = nn.parallel.gather(loss, target_device=self.devices[0])
+            l_value = l_value.sum()[0] / normalize
+            total += l_value.data[0]
 
             # Backprop loss to output of transformer
             if self.opt is not None:
-                l.backward()
-                for j, l in enumerate(loss):
+                l_value.backward()
+                for j, l_value in enumerate(loss):
                     out_grad[j].append(out_column[j][0].grad.data.clone())
 
         # Backprop all loss through transformer.
@@ -139,8 +139,7 @@ def run(**kwargs):
         train, val, test = datasets.IWSLT.splits(
             exts=('.de', '.en'),
             fields=(SRC, TGT),
-            filter_pred=
-            lambda x: len(vars(x)['src']) <= MAX_LEN and len(vars(x)['trg']) <= MAX_LEN
+            filter_pred=lambda x: len(vars(x)['src']) <= MAX_LEN and len(vars(x)['trg']) <= MAX_LEN
         )
         MIN_FREQ = 2
         SRC.build_vocab(train.src, min_freq=MIN_FREQ)
@@ -229,13 +228,15 @@ def run(**kwargs):
         print("Translation:", end="\t")
         for i in range(1, out.size(1)):
             sym = TGT.vocab.itos[out[0, i]]
-            if sym == "</s>": break
+            if sym == "</s>":
+                break
             print(sym, end=" ")
         print()
         print("Target:", end="\t")
         for i in range(1, batch.trg.size(0)):
             sym = TGT.vocab.itos[batch.trg.data[i, 0]]
-            if sym == "</s>": break
+            if sym == "</s>":
+                break
             print(sym, end=" ")
         print()
         break
@@ -252,7 +253,8 @@ def run(**kwargs):
     trans = "<s> "
     for i in range(1, out.size(1)):
         sym = TGT.itos[out[0, i]]
-        if sym == "</s>": break
+        if sym == "</s>":
+            break
         trans += sym + " "
     print(trans)
 
