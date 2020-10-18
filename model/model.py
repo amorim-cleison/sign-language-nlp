@@ -259,7 +259,8 @@ def make_model(src_vocab,
                d_model=512,
                d_ff=2048,
                h=8,
-               dropout=0.1):
+               dropout=0.1,
+               cuda_enabled=False):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
     attn = MultiHeadedAttention(h, d_model)
@@ -277,4 +278,7 @@ def make_model(src_vocab,
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform(p)
+
+    if cuda_enabled:
+        model.cuda()
     return model
