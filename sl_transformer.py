@@ -1,10 +1,12 @@
 import torch
 from torch.autograd import Variable
+from torch.functional import norm
 from model import make_model, subsequent_mask
 
 import torch.nn as nn
 from torchtext import data
-from commons.log import log
+from commons.log import log, log_progress
+from commons.util import exists, normpath
 
 BOS_WORD = '<bos>'
 EOS_WORD = '<eos>'
@@ -260,9 +262,14 @@ def build_dataset(input_dir):
                      unk_token=UNK_WORD,
                      pad_token=PAD_WORD)
 
+    # Create dataset if needed:
+    dataset_file = normpath(f"{input_dir}\\..\\data.json")
+    if not exists(dataset_file):
+        create_dataset(input_dir, dataset_file, 2)
+
     MAX_LEN = 100
     dataset = data.TabularDataset(
-        path=f"{input_dir}\\data.json",
+        path=dataset_file,
         format="json",
         fields={
             'frames': ('src', SRC),
@@ -279,6 +286,31 @@ def build_dataset(input_dir):
     TGT.build_vocab(dataset.trg, min_freq=MIN_FREQ)
 
     return train, val, test, TGT, SRC
+
+
+def create_dataset(input_dir, tgt_path, min_count):
+    from commons.util import save_items, filter_files, read_json
+    import json
+
+    files = filter_files(input_dir, ext="json", path_as_str=False)
+    processed = list()
+    log(f"Creating dataset to '{tgt_path}'...")
+
+    def prefix(file):
+        return file.stem.split('-')[0]
+    
+    for file in files:
+        if file not in processed:
+            file_prefix = prefix(file)
+            log_progress(len(processed), len(files), file_prefix)
+
+            similar = [x for x in files if prefix(x) == file_prefix]
+            processed.extend(similar)
+            
+            if len(similar) >= min_count:
+                samples = [json.dumps(read_json(x)) for x in similar]
+                save_items(samples, tgt_path, True)
+    log(f"Finished")
 
 
 def build_static_src_vocab():
