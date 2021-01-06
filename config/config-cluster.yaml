@@ -1,0 +1,4 @@
+attributes_dir: ~/work/asllvd-skeleton/dataset/phono-attributes/
+dataset_path: ~/work/asllvd-skeleton/dataset/data.json
+devices: [ 1 ]
+debug: False
