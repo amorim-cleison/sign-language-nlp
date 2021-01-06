@@ -2,6 +2,7 @@ import torch
 from torch.autograd import Variable
 from torch.functional import norm
 from model import make_model, subsequent_mask
+from dataset import create_dataset
 
 import torch.nn as nn
 from torchtext import data
@@ -21,14 +22,14 @@ EPS = 1e-9
 
 BATCH_SIZE = 3
 
+# Dataset:
+MIN_SAMPLES_DATASET = 3
 
-def run(input_dir, devices=None, **kwargs):
+
+def run(attributes_dir, dataset_path, devices=None, **kwargs):
     CUDA_ENABLED = (devices is not None) and len(devices) > 0
 
-    from os.path import abspath
-    input_dir = abspath(input_dir)
-
-    train, val, test, TGT, SRC = build_dataset(input_dir)
+    train, val, test, TGT, SRC = build_dataset(attributes_dir, dataset_path)
 
     model = make_model(len(SRC.vocab),
                        len(TGT.vocab),
@@ -211,7 +212,7 @@ def visualize_attention(model, trans, sent):
         plt.show()
 
 
-def build_dataset(input_dir):
+def build_dataset(attributes_dir, dataset_path):
     """
     SRC = data.Field(sequential=True,
                      unk_token=UNK_WORD,
@@ -241,13 +242,16 @@ def build_dataset(input_dir):
     # 'mouth_openness':0.5540059453054104
 
     FIELDS = [
-        "movement_dh_st", "movement_ndh_st", "orientation_dh",
-        "orientation_ndh"
+        "handshape_dh", "orientation_dh", "movement_dh_st"
     ]
 
     def compose_field(rows):
         return list(
-            map(lambda row: "-".join([f"{row[x]:<20}" for x in FIELDS]), rows))
+            map(
+                lambda row: "-".join([
+                    f"{(row[x]['value'] if row[x] else ''):<20}"
+                    for x in FIELDS
+                ]), rows))
         # return list(map(lambda row: [row[x] for x in FIELDS], rows))
 
     SRC = data.Field(sequential=True,
@@ -263,13 +267,13 @@ def build_dataset(input_dir):
                      pad_token=PAD_WORD)
 
     # Create dataset if needed:
-    dataset_file = normpath(f"{input_dir}\\..\\data.json")
-    if not exists(dataset_file):
-        create_dataset(input_dir, dataset_file, 2)
+    dataset_path = normpath(dataset_path)
+    if not exists(dataset_path):
+        create_dataset(attributes_dir, dataset_path, MIN_SAMPLES_DATASET)
 
     MAX_LEN = 100
     dataset = data.TabularDataset(
-        path=dataset_file,
+        path=dataset_path,
         format="json",
         fields={
             'frames': ('src', SRC),
@@ -279,38 +283,19 @@ def build_dataset(input_dir):
 
     # ratios (parameter): [ train, test, val]
     # output: (train, [val,] test)
-    train, val, test = dataset.split(split_ratio=[0.7, 0.3, 0.1])
+    splits = dataset.split(split_ratio=[0.7, 0.3, 0.1])
+
+    if len(splits) == 3:
+        train, val, test = splits
+    else:
+        train, test = splits
+        val = None
 
     MIN_FREQ = 2
     SRC.build_vocab(dataset.src, min_freq=MIN_FREQ)
     TGT.build_vocab(dataset.trg, min_freq=MIN_FREQ)
 
     return train, val, test, TGT, SRC
-
-
-def create_dataset(input_dir, tgt_path, min_count):
-    from commons.util import save_items, filter_files, read_json
-    import json
-
-    files = filter_files(input_dir, ext="json", path_as_str=False)
-    processed = list()
-    log(f"Creating dataset to '{tgt_path}'...")
-
-    def prefix(file):
-        return file.stem.split('-')[0]
-    
-    for file in files:
-        if file not in processed:
-            file_prefix = prefix(file)
-            log_progress(len(processed), len(files), file_prefix)
-
-            similar = [x for x in files if prefix(x) == file_prefix]
-            processed.extend(similar)
-            
-            if len(similar) >= min_count:
-                samples = [json.dumps(read_json(x)) for x in similar]
-                save_items(samples, tgt_path, True)
-    log(f"Finished")
 
 
 def build_static_src_vocab():

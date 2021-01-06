@@ -1,0 +1,3 @@
+attributes_dir: "/home/student/dl2/grp5/cca5/dataset/workdir/phono-attributes/"
+dataset_path: "/home/student/dl2/grp5/cca5/dataset/workdir/data.json"
+debug: False

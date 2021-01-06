@@ -1,7 +1,4 @@
 {
     "python.pythonPath": ".venv\\Scripts\\python.exe",
-    "python.dataScience.jupyterServerURI": "local",
-    "files.watcherExclude": {
-        "**/target": true
-    }
+    "python.formatting.provider": "yapf"
 }
