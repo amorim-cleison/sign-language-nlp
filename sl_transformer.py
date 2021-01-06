@@ -39,7 +39,7 @@ def run(attributes_dir, dataset_path, devices=None, **kwargs):
     def get_iter(dataset):
         return data.Iterator(dataset,
                              batch_size=BATCH_SIZE,
-                             device=devices,
+                             device=[torch.device(f"cuda:{d}" for d in devices) if devices else None],
                              repeat=False,
                              sort_key=lambda x: (len(x.src), len(x.trg)),
                              train=True)
