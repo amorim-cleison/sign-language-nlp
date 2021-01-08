@@ -37,25 +37,29 @@ def run(attributes_dir, dataset_path, devices=None, **kwargs):
                        cuda_enabled=CUDA_ENABLED)
 
     def get_iter(dataset):
-        return data.Iterator(dataset,
-                             batch_size=BATCH_SIZE,
-                             device=torch.device('cuda') if devices else None,
-                             repeat=False,
-                             sort_key=lambda x: (len(x.src), len(x.trg)),
-                             train=True)
+        if dataset:
+            return data.Iterator(dataset,
+                                batch_size=BATCH_SIZE,
+                                device=torch.device('cuda') if devices else None,
+                                repeat=False,
+                                sort_key=lambda x: (len(x.src), len(x.trg)),
+                                train=True)
 
     train_iter = get_iter(train)
     valid_iter = get_iter(val)
     test_iter = get_iter(test)
 
-    run_training(model, devices, train_iter, valid_iter, SRC, TGT,
+    run_training(model, devices, train_iter, valid_iter, TGT,
                  CUDA_ENABLED)
 
     run_validation(model, test_iter, SRC, TGT)
 
 
-def run_training(model, devices, train_iter, valid_iter, SRC, TGT,
+def run_training(model, devices, train_iter, valid_iter, TGT,
                  cuda_enabled):
+    if not valid_iter:
+        log("No data was provided for validation/evaluation. Executing only the training...", 2)
+
     pad_idx = TGT.vocab.stoi[PAD_WORD]
     criterion = LabelSmoothing(size=len(TGT.vocab),
                                padding_idx=pad_idx,
@@ -86,13 +90,14 @@ def run_training(model, devices, train_iter, valid_iter, SRC, TGT,
             get_loss_compute(model.generator, criterion, model_opt, devices,
                              cuda_enabled))
 
-        log("Evaluating...", 2)
-        model_par.eval()
-        loss = run_epoch(
-            get_iter(valid_iter), model_par,
-            get_loss_compute(model.generator, criterion, None, devices,
-                             cuda_enabled))
-        log(f" -> Loss: {loss}", 1)
+        if valid_iter:
+            log("Evaluating...", 2)
+            model_par.eval()
+            loss = run_epoch(
+                get_iter(valid_iter), model_par,
+                get_loss_compute(model.generator, criterion, None, devices,
+                                cuda_enabled))
+            log(f" -> Loss: {loss}", 1)
 
 
 def get_loss_compute(model_generator, criterion, opt, devices, cuda_enabled):
@@ -138,28 +143,28 @@ def run_validation(model, test_iter, SRC, TGT):
         print()
         break
 
-    model.eval()
-    # TODO: replate `sent` message
-    sent = "▁The ▁log ▁file ▁can ▁be ▁sent ▁secret ly ▁with ▁email ▁or ▁FTP ▁to ▁a ▁specified ▁receiver".split(
-    )
-    src = torch.LongTensor([[SRC.vocab.stoi[w] for w in sent]])
-    src = Variable(src)
-    src_mask = (src != SRC.vocab.stoi[PAD_WORD]).unsqueeze(-2)
-    out = greedy_decode(model,
-                        src,
-                        src_mask,
-                        max_len=60,
-                        start_symbol=TGT.stoi[BOS_WORD])
-    print("Translation:", end="\t")
-    trans = f"{BOS_WORD} "
-    for i in range(1, out.size(1)):
-        sym = TGT.itos[out[0, i]]
-        if sym == EOS_WORD:
-            break
-        trans += sym + " "
-    print(trans)
+    # model.eval()
+    # # TODO: replate `sent` message
+    # sent = "▁The ▁log ▁file ▁can ▁be ▁sent ▁secret ly ▁with ▁email ▁or ▁FTP ▁to ▁a ▁specified ▁receiver".split(
+    # )
+    # src = torch.LongTensor([[SRC.vocab.stoi[w] for w in sent]])
+    # src = Variable(src)
+    # src_mask = (src != SRC.vocab.stoi[PAD_WORD]).unsqueeze(-2)
+    # out = greedy_decode(model,
+    #                     src,
+    #                     src_mask,
+    #                     max_len=60,
+    #                     start_symbol=TGT.vocab.stoi[BOS_WORD])
+    # print("Translation:", end="\t")
+    # trans = f"{BOS_WORD} "
+    # for i in range(1, out.size(1)):
+    #     sym = TGT.itos[out[0, i]]
+    #     if sym == EOS_WORD:
+    #         break
+    #     trans += sym + " "
+    # print(trans)
 
-    visualize_attention(model, trans, sent)
+    # visualize_attention(model, trans, sent)
 
 
 def visualize_attention(model, trans, sent):
@@ -402,7 +407,7 @@ class MultiGPULossCompute:
             loss = nn.parallel.parallel_apply(self.criterion, y)
 
             # Sum and normalize loss
-            l_value = nn.parallel.gather(loss, target_device=self.devices[0])
+            l_value = nn.parallel.gather([loss], target_device=self.devices[0])
             l_value = l_value.sum()[0] / normalize
             total += l_value.data[0]
 
