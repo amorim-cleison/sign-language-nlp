@@ -407,9 +407,9 @@ class MultiGPULossCompute:
             loss = nn.parallel.parallel_apply(self.criterion, y)
 
             # Sum and normalize loss
-            l_value = nn.parallel.gather([loss], target_device=self.devices[0])
-            l_value = l_value.sum()[0] / normalize
-            total += l_value.data[0]
+            l_value = nn.parallel.gather(loss, target_device=self.devices[0])
+            l_value = l_value.sum() / normalize
+            total += l_value
 
             # Backprop loss to output of transformer
             if self.opt is not None:
