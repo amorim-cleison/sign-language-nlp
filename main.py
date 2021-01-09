@@ -8,6 +8,7 @@ ARGUMENTS = [
     Argument('-ad', '--attributes_dir', type=str, required=True, help='Attributes directory'),
     Argument('-dp', '--dataset_path', type=str, required=True, help='Dataset path'),
     Argument('-de', '--devices', type=list, required=False, help='GPUs to use'),
+    Argument('-e', '--epochs', type=int, required=True, help='# of training epochs'),
     Argument('-d', '--debug', type=bool, help='Debug flag'),
 ]
 

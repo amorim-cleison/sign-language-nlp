@@ -2,3 +2,5 @@ attributes_dir: ~/work/asllvd-skeleton/dataset/phono-attributes/
 dataset_path: ~/work/asllvd-skeleton/dataset/data.json
 devices: [ 0 ]
 debug: False
+
+epochs: 10

@@ -26,7 +26,7 @@ BATCH_SIZE = 3
 MIN_SAMPLES_DATASET = 3
 
 
-def run(attributes_dir, dataset_path, devices=None, **kwargs):
+def run(attributes_dir, dataset_path, epochs, devices=None, **kwargs):
     CUDA_ENABLED = (devices is not None) and len(devices) > 0
 
     train, val, test, TGT, SRC = build_dataset(attributes_dir, dataset_path)
@@ -49,13 +49,13 @@ def run(attributes_dir, dataset_path, devices=None, **kwargs):
     valid_iter = get_iter(val)
     test_iter = get_iter(test)
 
-    run_training(model, devices, train_iter, valid_iter, TGT,
+    run_training(model, devices, epochs, train_iter, valid_iter, TGT,
                  CUDA_ENABLED)
 
     run_validation(model, test_iter, SRC, TGT)
 
 
-def run_training(model, devices, train_iter, valid_iter, TGT,
+def run_training(model, devices, epochs, train_iter, valid_iter, TGT,
                  cuda_enabled):
     if not valid_iter:
         log("No data was provided for validation/evaluation. Executing only the training...", 2)
@@ -79,11 +79,11 @@ def run_training(model, devices, train_iter, valid_iter, TGT,
         pad_idx = TGT.vocab.stoi[PAD_WORD]
         return (rebatch(pad_idx, b) for b in iter)
 
-    for epoch in range(10):
+    for epoch in range(epochs):
         log("-" * 30)
-        log(f"EPOCH {epoch+1} \n", 1)
+        log(f"EPOCH {epoch+1}", 1)
 
-        log("Training...", 2)
+        log("\nTraining...", 2)
         model_par.train()
         run_epoch(
             get_iter(train_iter), model_par,
@@ -91,12 +91,12 @@ def run_training(model, devices, train_iter, valid_iter, TGT,
                              cuda_enabled))
 
         if valid_iter:
-            log("Evaluating...", 2)
+            log("\nEvaluating...", 2)
             model_par.eval()
             loss = run_epoch(
                 get_iter(valid_iter), model_par,
                 get_loss_compute(model.generator, criterion, None, devices,
-                                cuda_enabled))
+                                 cuda_enabled))
             log(f" -> Loss: {loss}", 1)
 
 
