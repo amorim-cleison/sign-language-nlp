@@ -23,7 +23,7 @@ EPS = 1e-9
 BATCH_SIZE = 3
 
 # Dataset:
-MIN_SAMPLES_DATASET = 3
+MIN_SAMPLES_DATASET = 5
 
 
 def run(attributes_dir, dataset_path, epochs, devices=None, **kwargs):
@@ -36,29 +36,41 @@ def run(attributes_dir, dataset_path, epochs, devices=None, **kwargs):
                        N=6,
                        cuda_enabled=CUDA_ENABLED)
 
-    def get_iter(dataset):
-        if dataset:
-            return data.Iterator(dataset,
-                                batch_size=BATCH_SIZE,
-                                device=torch.device('cuda') if devices else None,
-                                repeat=False,
-                                sort_key=lambda x: (len(x.src), len(x.trg)),
-                                train=True)
-
-    train_iter = get_iter(train)
-    valid_iter = get_iter(val)
-    test_iter = get_iter(test)
+    train_iter = create_iterator(train, True, CUDA_ENABLED)
+    valid_iter = create_iterator(val, False, CUDA_ENABLED)
+    test_iter = create_iterator(test, False, CUDA_ENABLED)
 
     run_training(model, devices, epochs, train_iter, valid_iter, TGT,
                  CUDA_ENABLED)
 
-    run_validation(model, test_iter, SRC, TGT)
+    run_test(model, test_iter, SRC, TGT)
 
+
+def create_iterator(dataset, train, cuda_enabled):
+    if dataset:
+        return data.Iterator(
+            dataset,
+            batch_size=BATCH_SIZE,
+            device=torch.device('cuda') if cuda_enabled else None,
+            repeat=False,
+            sort_key=lambda x: (len(x.src), len(x.trg)),
+            train=train)
+
+
+def log_stage(stage:str):
+    assert (stage is not None)
+    log("")
+    log(("=" * 50))
+    log(f"{stage.upper()}", 1)
+    log(("=" * 50))
+    log("")
 
 def run_training(model, devices, epochs, train_iter, valid_iter, TGT,
                  cuda_enabled):
+    log_stage("Training")
+
     if not valid_iter:
-        log("No data was provided for validation/evaluation. Executing only the training...", 2)
+        log("No data was provided for validation/evaluation. Proceeding with training only...", 2)
 
     pad_idx = TGT.vocab.stoi[PAD_WORD]
     criterion = LabelSmoothing(size=len(TGT.vocab),
@@ -71,33 +83,36 @@ def run_training(model, devices, epochs, train_iter, valid_iter, TGT,
     model_par = nn.DataParallel(model, device_ids=devices)
 
     # Optimizer:
-    model_opt = NoamOpt(
-        model.src_embed[0].d_model, 1, WARM_UP,
-        torch.optim.Adam(model.parameters(), lr=LR, betas=BETAS, eps=EPS))
+    optimizer = torch.optim.Adam(model.parameters(),
+                                 lr=LR,
+                                 betas=BETAS,
+                                 eps=EPS)
+    model_opt = NoamOpt(model.src_embed[0].d_model, 1, WARM_UP, optimizer)
 
     def get_iter(iter):
         pad_idx = TGT.vocab.stoi[PAD_WORD]
         return (rebatch(pad_idx, b) for b in iter)
 
     for epoch in range(epochs):
-        log("-" * 30)
+        log("\n" + ("-" * 30))
         log(f"EPOCH {epoch+1}", 1)
 
         log("\nTraining...", 2)
         model_par.train()
-        run_epoch(
+        tr_loss = run_epoch(
             get_iter(train_iter), model_par,
             get_loss_compute(model.generator, criterion, model_opt, devices,
                              cuda_enabled))
+        log(f" -> Loss: {tr_loss}", 1)
 
         if valid_iter:
             log("\nEvaluating...", 2)
             model_par.eval()
-            loss = run_epoch(
+            ev_loss = run_epoch(
                 get_iter(valid_iter), model_par,
                 get_loss_compute(model.generator, criterion, None, devices,
                                  cuda_enabled))
-            log(f" -> Loss: {loss}", 1)
+            log(f" -> Loss: {ev_loss}", 1)
 
 
 def get_loss_compute(model_generator, criterion, opt, devices, cuda_enabled):
@@ -110,7 +125,9 @@ def get_loss_compute(model_generator, criterion, opt, devices, cuda_enabled):
         return SimpleLossCompute(model_generator, criterion, opt)
 
 
-def run_validation(model, test_iter, SRC, TGT):
+def run_test(model, test_iter, SRC, TGT):
+    log_stage("Test")
+
     # Once trained we can decode the model to produce a set of translations.
     # Here we simply translate the first sentence in the validation set.
     # This dataset is pretty small so the translations with greedy search
@@ -118,6 +135,7 @@ def run_validation(model, test_iter, SRC, TGT):
     model.eval()
 
     for i, batch in enumerate(test_iter):
+        log("-----")
         src = batch.src.transpose(0, 1)[:1]
         src_mask = (src != SRC.vocab.stoi[PAD_WORD]).unsqueeze(-2)
         out = greedy_decode(model,
@@ -126,22 +144,21 @@ def run_validation(model, test_iter, SRC, TGT):
                             max_len=60,
                             start_symbol=TGT.vocab.stoi[BOS_WORD])
 
-        print("Translation:", end="\t")
+        log(f"{'Translation:':<15}", end="")
         for i in range(1, out.size(1)):
             sym = TGT.vocab.itos[out[0, i]]
             if sym == EOS_WORD:
                 break
-            print(sym, end=" ")
-        print()
+            log(sym, end=" ")
+        log("")
 
-        print("Target:", end="\t")
+        log(f"{'Target:':<15}", end="")
         for i in range(1, batch.trg.size(0)):
             sym = TGT.vocab.itos[batch.trg.data[i, 0]]
             if sym == EOS_WORD:
                 break
-            print(sym, end=" ")
-        print()
-        break
+            log(sym, end=" ")
+        log("\n")
 
     # model.eval()
     # # TODO: replate `sent` message
@@ -188,7 +205,7 @@ def visualize_attention(model, trans, sent):
 
     for layer in range(1, 6, 2):
         fig, axs = plt.subplots(1, 4, figsize=(20, 10))
-        print("Encoder Layer", layer + 1)
+        log(f"Encoder Layer {layer + 1}")
         for h in range(4):
             draw(model.encoder.layers[layer].self_attn.attn[0, h].data,
                  sent,
@@ -198,7 +215,7 @@ def visualize_attention(model, trans, sent):
 
     for layer in range(1, 6, 2):
         fig, axs = plt.subplots(1, 4, figsize=(20, 10))
-        print("Decoder Self Layer", layer + 1)
+        log(f"Decoder Self Layer {layer + 1}")
         for h in range(4):
             draw(model.decoder.layers[layer].self_attn.attn[
                 0, h].data[:len(tgt_sent), :len(tgt_sent)],
@@ -206,7 +223,7 @@ def visualize_attention(model, trans, sent):
                  tgt_sent if h == 0 else [],
                  ax=axs[h])
         plt.show()
-        print("Decoder Src Layer", layer + 1)
+        log(f"Decoder Src Layer {layer + 1}")
         fig, axs = plt.subplots(1, 4, figsize=(20, 10))
         for h in range(4):
             draw(model.decoder.layers[layer].self_attn.attn[
@@ -471,8 +488,8 @@ def run_epoch(data_iter, model, loss_compute):
         tokens += batch.ntokens
         if i % 50 == 1:
             elapsed = time.time() - start
-            print("Epoch Step: %d Loss: %f Tokens per Sec: %f" %
-                  (i, loss / batch.ntokens, tokens / elapsed))
+            log(" Step: %d Loss: %f Tokens per Sec: %f" %
+                (i, loss / batch.ntokens, tokens / elapsed))
             start = time.time()
             tokens = 0
     return total_loss / total_tokens
@@ -487,7 +504,7 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
             Variable(subsequent_mask(ys.size(1)).type_as(src.data)))
         prob = model.generator(out[:, -1])
         _, next_word = torch.max(prob, dim=1)
-        next_word = next_word.data[0]
+        next_word = next_word.item()
         ys = torch.cat(
             [ys, torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
     return ys

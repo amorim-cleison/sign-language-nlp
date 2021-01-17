@@ -3,4 +3,4 @@ dataset_path: /home/student/dl2/grp5/cca5/dataset/workdir/data-debug.json
 devices: [ ]
 debug: False
 
-epochs: 1
+epochs: 3
