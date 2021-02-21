@@ -31,7 +31,7 @@ jobs:
       with:
         repository: amorim-cleison/commons-python.git
         ref: develop
-        path: commons-python
+        path: ../commons-python
           
     - name: Setup Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
