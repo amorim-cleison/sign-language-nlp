@@ -39,17 +39,17 @@ def run(devices, dataset, model, training, **kwargs):
 
 def get_iter(dataset, batch_size, devices, train, pad_idx):
     if dataset:
-        iter = data.Iterator(dataset,
+        return data.Iterator(dataset,
                              batch_size=batch_size,
                              device=torch.device('cuda') if devices else None,
                              repeat=False,
                              sort_key=lambda x: (len(x.src), len(x.trg)),
                              train=train)
-        return (rebatch(pad_idx, b) for b in iter)
 
 
 def run_training(model, devices, epochs, train_data, valid_data, batch_size,
-                 SRC, TGT, cuda_enabled, warm_up, lr, betas, eps, **kwargs):
+                 SRC, TGT, cuda_enabled, warm_up, lr, betas, eps, log_interval,
+                 **kwargs):
     pad_idx = TGT.vocab.stoi[PAD_WORD]
     criterion = LabelSmoothing(size=len(TGT.vocab),
                                padding_idx=pad_idx,
@@ -80,10 +80,13 @@ def run_training(model, devices, epochs, train_data, valid_data, batch_size,
         log("")
         log("Training...", 2)
         model_par.train()
-        run_epoch(
-            train_iter, model_par,
-            get_loss_compute(model.generator, criterion, model_opt, devices,
-                             cuda_enabled))
+        run_epoch(data_iter=train_iter,
+                  model=model_par,
+                  loss_compute=get_loss_compute(model.generator, criterion,
+                                                model_opt, devices,
+                                                cuda_enabled),
+                  pad_idx=pad_idx,
+                  log_interval=log_interval)
 
         if valid_iter:
             log("")
@@ -91,15 +94,17 @@ def run_training(model, devices, epochs, train_data, valid_data, batch_size,
 
             # Verify loss:
             model_par.eval()
-            loss = run_epoch(valid_iter,
-                             model_par,
-                             get_loss_compute(model.generator, criterion, None,
-                                              devices, cuda_enabled),
+            loss = run_epoch(data_iter=valid_iter,
+                             model=model_par,
+                             loss_compute=get_loss_compute(
+                                 model.generator, criterion, None, devices,
+                                 cuda_enabled),
+                             pad_idx=pad_idx,
                              log_interval=None)
             log(f"  Loss: {loss:f}", 1)
 
             # Verify accuracy
-            accuracy = run_validation(model, valid_iter, SRC, TGT)
+            accuracy = calculate_accuracy(model, valid_iter, SRC, TGT)
             log(f"  Accuracy: {accuracy:f}", 1)
 
 
@@ -113,7 +118,7 @@ def get_loss_compute(model_generator, criterion, opt, devices, cuda_enabled):
         return SimpleLossCompute(model_generator, criterion, opt)
 
 
-def run_validation(model, test_iter, SRC, TGT):
+def calculate_accuracy(model, test_iter, SRC, TGT):
     TO_IGNORE = [TGT.vocab.stoi[BOS_WORD], TGT.vocab.stoi[EOS_WORD]]
 
     def get_mask(tensor, to_ignore):
@@ -153,7 +158,7 @@ def run_validation(model, test_iter, SRC, TGT):
         ]
         total += tgt.size(0)
         correct += sum(correct_items)
-    accuracy = (correct / total)
+    accuracy = (correct / total) if (total > 0) else 0
     return accuracy
 
 
@@ -442,10 +447,11 @@ class LabelSmoothing(nn.Module):
         return self.criterion(x, Variable(true_dist, requires_grad=False))
 
 
-def run_epoch(data_iter, model, loss_compute, log_interval=5):
+def run_epoch(data_iter, model, loss_compute, pad_idx, log_interval=5):
     "Standard Training and Logging Function"
     import time
 
+    data_iter = (rebatch(pad_idx, b) for b in data_iter)
     start = time.time()
     total_tokens = 0
     total_loss = 0
@@ -464,7 +470,7 @@ def run_epoch(data_iter, model, loss_compute, log_interval=5):
                 (i, loss / batch.ntokens, tokens / elapsed))
             start = time.time()
             tokens = 0
-    return total_loss / total_tokens
+    return (total_loss / total_tokens) if (total_tokens > 0) else 0
 
 
 def greedy_decode(model, src, src_mask, max_len, start_symbol, end_symbol):

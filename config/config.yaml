@@ -32,3 +32,4 @@ training:
   lr: 0
   betas: [0.9, 0.98]
   eps: 0.000000001
+  log_interval: 5
