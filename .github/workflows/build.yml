@@ -29,7 +29,7 @@ jobs:
     - name: Checkout commons-python
       uses: actions/checkout@v2
       with:
-        repository: https://github.com/amorim-cleison/commons-python.git
+        repository: amorim-cleison/commons-python.git
         ref: develop
         path: commons-python
           
