@@ -2,10 +2,11 @@ from commons.log import log, log_progress
 
 
 def create_dataset(attributes_dir, tgt_path, min_count):
-    from commons.util import save_items, filter_files, read_json
+    from commons.util import save_items, filter_files, read_json, exists
     import json
 
     log(f"Creating dataset to '{tgt_path}'...")
+    assert exists(attributes_dir), "Invalid attributes directory"
     files = filter_files(attributes_dir, ext="json", path_as_str=False)
     processed = list()
 
@@ -26,4 +27,4 @@ def create_dataset(attributes_dir, tgt_path, min_count):
                     for x in similar
                 ]
                 save_items(samples, tgt_path, True)
-    log(f"Finished")
+    log("Finished")

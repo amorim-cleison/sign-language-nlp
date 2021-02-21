@@ -5,11 +5,11 @@ from commons.util import Argument, load_args
 
 
 ARGUMENTS = [
-    Argument('-ad', '--attributes_dir', type=str, required=True, help='Attributes directory'),
-    Argument('-dp', '--dataset_path', type=str, required=True, help='Dataset path'),
-    Argument('-de', '--devices', type=list, required=False, help='GPUs to use'),
-    Argument('-e', '--epochs', type=int, required=True, help='# of training epochs'),
     Argument('-d', '--debug', type=bool, help='Debug flag'),
+    Argument('-de', '--devices', type=int, help='# of available GPUs to use'),
+    Argument('-ds', '--dataset', type=dict, help='Options for the dataset'),
+    Argument('-md', '--model', type=dict, help='Options for the model'),
+    Argument('-tr', '--training', type=dict, help='Options for the training'),
 ]
 
 if __name__ == "__main__":

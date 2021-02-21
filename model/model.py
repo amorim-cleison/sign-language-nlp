@@ -23,7 +23,6 @@ class EncoderDecoder(nn.Module):
     A standard Encoder-Decoder architecture. Base for this and many
     other models.
     """
-
     def __init__(self, encoder, decoder, src_embed, tgt_embed, generator):
         super(EncoderDecoder, self).__init__()
         self.encoder = encoder
@@ -94,7 +93,6 @@ class SublayerConnection(nn.Module):
     A residual connection followed by a layer norm.
     Note for code simplicity the norm is first as opposed to last.
     """
-
     def __init__(self, size, dropout):
         super(SublayerConnection, self).__init__()
         self.norm = LayerNorm(size)
@@ -199,8 +197,11 @@ class MultiHeadedAttention(nn.Module):
         ]
 
         # 2) Apply attention on all the projected vectors in batch.
-        x, self.attn = attention(
-            query, key, value, mask=mask, dropout=self.dropout)
+        x, self.attn = attention(query,
+                                 key,
+                                 value,
+                                 mask=mask,
+                                 dropout=self.dropout)
 
         # 3) "Concat" using a view and apply a final linear.
         x = x.transpose(1, 2).contiguous().view(nbatches, -1,
@@ -260,7 +261,8 @@ def make_model(src_vocab,
                d_ff=2048,
                h=8,
                dropout=0.1,
-               cuda_enabled=False):
+               cuda_enabled=False,
+               **kwargs):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
     attn = MultiHeadedAttention(h, d_model)

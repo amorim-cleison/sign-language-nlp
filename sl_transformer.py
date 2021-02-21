@@ -1,65 +1,55 @@
 import torch
-from torch.autograd import Variable
-from torch.functional import norm
-from model import make_model, subsequent_mask
-from dataset import create_dataset
-
 import torch.nn as nn
-from torchtext import data
-from commons.log import log, log_progress
+from commons.log import log
 from commons.util import exists, normpath
+from torch.autograd import Variable
+from torchtext import data
+
+from dataset import create_dataset
+from model import make_model, subsequent_mask
 
 BOS_WORD = '<bos>'
 EOS_WORD = '<eos>'
 UNK_WORD = '<unk>'
 PAD_WORD = '<pad>'
 
-# TODO: check those parameters
-WARM_UP = 400
-LR = 0
-BETAS = (0.9, 0.98)
-EPS = 1e-9
 
-BATCH_SIZE = 3
-
-# Dataset:
-MIN_SAMPLES_DATASET = 3
-
-
-def run(attributes_dir, dataset_path, epochs, devices=None, **kwargs):
+def run(devices, dataset, model, training, **kwargs):
     CUDA_ENABLED = (devices is not None) and len(devices) > 0
 
-    train, val, test, TGT, SRC = build_dataset(attributes_dir, dataset_path)
+    # Dataset:
+    train_data, _, val_data, TGT, SRC = build_dataset(**dataset)
 
+    # Model:
     model = make_model(len(SRC.vocab),
                        len(TGT.vocab),
-                       N=6,
-                       cuda_enabled=CUDA_ENABLED)
+                       cuda_enabled=CUDA_ENABLED,
+                       **training)
 
-    def get_iter(dataset):
-        if dataset:
-            return data.Iterator(dataset,
-                                batch_size=BATCH_SIZE,
-                                device=torch.device('cuda') if devices else None,
-                                repeat=False,
-                                sort_key=lambda x: (len(x.src), len(x.trg)),
-                                train=True)
-
-    train_iter = get_iter(train)
-    valid_iter = get_iter(val)
-    test_iter = get_iter(test)
-
-    run_training(model, devices, epochs, train_iter, valid_iter, TGT,
-                 CUDA_ENABLED)
-
-    run_validation(model, test_iter, SRC, TGT)
+    # Training:
+    run_training(model=model,
+                 devices=devices,
+                 train_data=train_data,
+                 valid_data=val_data,
+                 SRC=SRC,
+                 TGT=TGT,
+                 cuda_enabled=CUDA_ENABLED,
+                 **training)
 
 
-def run_training(model, devices, epochs, train_iter, valid_iter, TGT,
-                 cuda_enabled):
-    if not valid_iter:
-        log("No data was provided for validation/evaluation. Executing only the training...", 2)
+def get_iter(dataset, batch_size, devices, train, pad_idx):
+    if dataset:
+        iter = data.Iterator(dataset,
+                             batch_size=batch_size,
+                             device=torch.device('cuda') if devices else None,
+                             repeat=False,
+                             sort_key=lambda x: (len(x.src), len(x.trg)),
+                             train=train)
+        return (rebatch(pad_idx, b) for b in iter)
 
+
+def run_training(model, devices, epochs, train_data, valid_data, batch_size,
+                 SRC, TGT, cuda_enabled, warm_up, lr, betas, eps, **kwargs):
     pad_idx = TGT.vocab.stoi[PAD_WORD]
     criterion = LabelSmoothing(size=len(TGT.vocab),
                                padding_idx=pad_idx,
@@ -72,32 +62,45 @@ def run_training(model, devices, epochs, train_iter, valid_iter, TGT,
 
     # Optimizer:
     model_opt = NoamOpt(
-        model.src_embed[0].d_model, 1, WARM_UP,
-        torch.optim.Adam(model.parameters(), lr=LR, betas=BETAS, eps=EPS))
+        model.src_embed[0].d_model, 1, warm_up,
+        torch.optim.Adam(model.parameters(),
+                         lr=lr,
+                         betas=tuple(betas),
+                         eps=eps))
+    # Iterators:
+    train_iter = get_iter(train_data, batch_size, devices, True, pad_idx)
+    valid_iter = get_iter(valid_data, batch_size, devices, False, pad_idx)
 
-    def get_iter(iter):
-        pad_idx = TGT.vocab.stoi[PAD_WORD]
-        return (rebatch(pad_idx, b) for b in iter)
-
+    # Run epochs:
     for epoch in range(epochs):
-        log("-" * 30)
+        log("")
+        log(("-" * 30))
         log(f"EPOCH {epoch+1}", 1)
 
-        log("\nTraining...", 2)
+        log("")
+        log("Training...", 2)
         model_par.train()
         run_epoch(
-            get_iter(train_iter), model_par,
+            train_iter, model_par,
             get_loss_compute(model.generator, criterion, model_opt, devices,
                              cuda_enabled))
 
         if valid_iter:
-            log("\nEvaluating...", 2)
+            log("")
+            log("Evaluating...", 2)
+
+            # Verify loss:
             model_par.eval()
-            loss = run_epoch(
-                get_iter(valid_iter), model_par,
-                get_loss_compute(model.generator, criterion, None, devices,
-                                 cuda_enabled))
-            log(f" -> Loss: {loss}", 1)
+            loss = run_epoch(valid_iter,
+                             model_par,
+                             get_loss_compute(model.generator, criterion, None,
+                                              devices, cuda_enabled),
+                             log_interval=None)
+            log(f"  Loss: {loss:f}", 1)
+
+            # Verify accuracy
+            accuracy = run_validation(model, valid_iter, SRC, TGT)
+            log(f"  Accuracy: {accuracy:f}", 1)
 
 
 def get_loss_compute(model_generator, criterion, opt, devices, cuda_enabled):
@@ -111,65 +114,53 @@ def get_loss_compute(model_generator, criterion, opt, devices, cuda_enabled):
 
 
 def run_validation(model, test_iter, SRC, TGT):
+    TO_IGNORE = [TGT.vocab.stoi[BOS_WORD], TGT.vocab.stoi[EOS_WORD]]
+
+    def get_mask(tensor, to_ignore):
+        mask = torch.ones_like(tensor).fill_(True).type_as(tensor.bool())
+
+        for symbol in to_ignore:
+            mask = mask & (tensor != symbol)
+        return mask
+
+    def matches(out, tgt):
+        return (len(out) == len(tgt)) and all(out.eq(tgt))
+
     # Once trained we can decode the model to produce a set of translations.
     # Here we simply translate the first sentence in the validation set.
     # This dataset is pretty small so the translations with greedy search
     # are reasonably accurate.
     model.eval()
 
+    total = 0
+    correct = 0
+
     for i, batch in enumerate(test_iter):
-        src = batch.src.transpose(0, 1)[:1]
-        src_mask = (src != SRC.vocab.stoi[PAD_WORD]).unsqueeze(-2)
-        out = greedy_decode(model,
-                            src,
-                            src_mask,
-                            max_len=60,
-                            start_symbol=TGT.vocab.stoi[BOS_WORD])
+        with torch.no_grad():
+            src = batch.src.transpose(0, 1)
+            src_mask = (src != SRC.vocab.stoi[PAD_WORD]).unsqueeze(-2)
+            out = greedy_decode(model,
+                                src,
+                                src_mask,
+                                max_len=60,
+                                start_symbol=TGT.vocab.stoi[BOS_WORD],
+                                end_symbol=TGT.vocab.stoi[EOS_WORD])
 
-        print("Translation:", end="\t")
-        for i in range(1, out.size(1)):
-            sym = TGT.vocab.itos[out[0, i]]
-            if sym == EOS_WORD:
-                break
-            print(sym, end=" ")
-        print()
-
-        print("Target:", end="\t")
-        for i in range(1, batch.trg.size(0)):
-            sym = TGT.vocab.itos[batch.trg.data[i, 0]]
-            if sym == EOS_WORD:
-                break
-            print(sym, end=" ")
-        print()
-        break
-
-    # model.eval()
-    # # TODO: replate `sent` message
-    # sent = "▁The ▁log ▁file ▁can ▁be ▁sent ▁secret ly ▁with ▁email ▁or ▁FTP ▁to ▁a ▁specified ▁receiver".split(
-    # )
-    # src = torch.LongTensor([[SRC.vocab.stoi[w] for w in sent]])
-    # src = Variable(src)
-    # src_mask = (src != SRC.vocab.stoi[PAD_WORD]).unsqueeze(-2)
-    # out = greedy_decode(model,
-    #                     src,
-    #                     src_mask,
-    #                     max_len=60,
-    #                     start_symbol=TGT.vocab.stoi[BOS_WORD])
-    # print("Translation:", end="\t")
-    # trans = f"{BOS_WORD} "
-    # for i in range(1, out.size(1)):
-    #     sym = TGT.itos[out[0, i]]
-    #     if sym == EOS_WORD:
-    #         break
-    #     trans += sym + " "
-    # print(trans)
-
-    # visualize_attention(model, trans, sent)
+        tgt = batch.trg.transpose(0, 1)
+        correct_items = [
+            matches(o[o_mask], t[t_mask]) for (o, o_mask, t, t_mask) in zip(
+                out, get_mask(out, TO_IGNORE), tgt, get_mask(tgt, TO_IGNORE))
+        ]
+        total += tgt.size(0)
+        correct += sum(correct_items)
+    accuracy = (correct / total)
+    return accuracy
 
 
 def visualize_attention(model, trans, sent):
-    import seaborn
     import matplotlib.pyplot as plt
+    import seaborn
+
     # Attention Visualization
     # Even with a greedy decoder the translation looks pretty good. We can further
     # visualize it to see what is happening at each layer of the attention
@@ -188,7 +179,7 @@ def visualize_attention(model, trans, sent):
 
     for layer in range(1, 6, 2):
         fig, axs = plt.subplots(1, 4, figsize=(20, 10))
-        print("Encoder Layer", layer + 1)
+        log(f"Encoder Layer {layer + 1}")
         for h in range(4):
             draw(model.encoder.layers[layer].self_attn.attn[0, h].data,
                  sent,
@@ -198,7 +189,7 @@ def visualize_attention(model, trans, sent):
 
     for layer in range(1, 6, 2):
         fig, axs = plt.subplots(1, 4, figsize=(20, 10))
-        print("Decoder Self Layer", layer + 1)
+        log(f"Decoder Self Layer {layer + 1}")
         for h in range(4):
             draw(model.decoder.layers[layer].self_attn.attn[
                 0, h].data[:len(tgt_sent), :len(tgt_sent)],
@@ -206,7 +197,7 @@ def visualize_attention(model, trans, sent):
                  tgt_sent if h == 0 else [],
                  ax=axs[h])
         plt.show()
-        print("Decoder Src Layer", layer + 1)
+        log(f"Decoder Src Layer {layer + 1}")
         fig, axs = plt.subplots(1, 4, figsize=(20, 10))
         for h in range(4):
             draw(model.decoder.layers[layer].self_attn.attn[
@@ -217,7 +208,9 @@ def visualize_attention(model, trans, sent):
         plt.show()
 
 
-def build_dataset(attributes_dir, dataset_path):
+def build_dataset(path, attributes_dir, fields, samples_min_freq,
+                  max_len_sentence, train_split_ratio, vocab_min_freq,
+                  **kwargs):
     """
     SRC = data.Field(sequential=True,
                      unk_token=UNK_WORD,
@@ -240,22 +233,19 @@ def build_dataset(attributes_dir, dataset_path):
         },
         filter_pred=lambda x: len(vars(x)['src']) <= MAX_LEN)
     """
+
     # movement_dh_st':''
     # 'movement_ndh_st':''
     # 'orientation_dh':'back'
     # 'orientation_ndh':'front'
     # 'mouth_openness':0.5540059453054104
 
-    FIELDS = [
-        "handshape_dh", "orientation_dh", "movement_dh_st"
-    ]
-
     def compose_field(rows):
         return list(
             map(
                 lambda row: "-".join([
                     f"{(row[x]['value'] if row[x] else ''):<20}"
-                    for x in FIELDS
+                    for x in fields
                 ]), rows))
         # return list(map(lambda row: [row[x] for x in FIELDS], rows))
 
@@ -272,23 +262,23 @@ def build_dataset(attributes_dir, dataset_path):
                      pad_token=PAD_WORD)
 
     # Create dataset if needed:
-    dataset_path = normpath(dataset_path)
-    if not exists(dataset_path):
-        create_dataset(attributes_dir, dataset_path, MIN_SAMPLES_DATASET)
+    path = normpath(path)
+    if not exists(path):
+        create_dataset(attributes_dir, path, samples_min_freq)
 
-    MAX_LEN = 100
     dataset = data.TabularDataset(
-        path=dataset_path,
+        path=path,
         format="json",
         fields={
-            'frames': ('src', SRC),
+            'phonos': ('src', SRC),
             'label': ('trg', TGT)
         },
-        filter_pred=lambda x: len(vars(x)['src']) <= MAX_LEN)
+        filter_pred=lambda x: len(vars(x)['src']) <= max_len_sentence)
 
     # ratios (parameter): [ train, test, val]
     # output: (train, [val,] test)
-    splits = dataset.split(split_ratio=[0.7, 0.3, 0.1])
+    splits = dataset.split(
+        split_ratio=[train_split_ratio, 1 - train_split_ratio])
 
     if len(splits) == 3:
         train, val, test = splits
@@ -296,9 +286,8 @@ def build_dataset(attributes_dir, dataset_path):
         train, test = splits
         val = None
 
-    MIN_FREQ = 2
-    SRC.build_vocab(dataset.src, min_freq=MIN_FREQ)
-    TGT.build_vocab(dataset.trg, min_freq=MIN_FREQ)
+    SRC.build_vocab(dataset.src, min_freq=vocab_min_freq)
+    TGT.build_vocab(dataset.trg, min_freq=vocab_min_freq)
 
     return train, val, test, TGT, SRC
 
@@ -453,7 +442,7 @@ class LabelSmoothing(nn.Module):
         return self.criterion(x, Variable(true_dist, requires_grad=False))
 
 
-def run_epoch(data_iter, model, loss_compute):
+def run_epoch(data_iter, model, loss_compute, log_interval=5):
     "Standard Training and Logging Function"
     import time
 
@@ -469,27 +458,30 @@ def run_epoch(data_iter, model, loss_compute):
         total_loss += loss
         total_tokens += batch.ntokens
         tokens += batch.ntokens
-        if i % 50 == 1:
+        if log_interval and (i % log_interval) == 1:
             elapsed = time.time() - start
-            print("Epoch Step: %d Loss: %f Tokens per Sec: %f" %
-                  (i, loss / batch.ntokens, tokens / elapsed))
+            log("  Epoch Step: %d Loss: %f Tokens per Sec: %f" %
+                (i, loss / batch.ntokens, tokens / elapsed))
             start = time.time()
             tokens = 0
     return total_loss / total_tokens
 
 
-def greedy_decode(model, src, src_mask, max_len, start_symbol):
+def greedy_decode(model, src, src_mask, max_len, start_symbol, end_symbol):
     memory = model.encode(src, src_mask)
-    ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
+    ys = torch.ones(src.size(0), 1).fill_(start_symbol).type_as(src.data)
+
     for i in range(max_len - 1):
         out = model.decode(
             memory, src_mask, Variable(ys),
             Variable(subsequent_mask(ys.size(1)).type_as(src.data)))
         prob = model.generator(out[:, -1])
         _, next_word = torch.max(prob, dim=1)
-        next_word = next_word.data[0]
-        ys = torch.cat(
-            [ys, torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
+        next_word = next_word.data
+        ys = torch.cat([ys, next_word.unsqueeze(-1)], dim=1)
+
+        if all(next_word == end_symbol):
+            break
     return ys
 
 

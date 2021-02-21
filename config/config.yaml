@@ -1,6 +1,34 @@
-attributes_dir: /home/student/dl2/grp5/cca5/dataset/workdir/phono-attributes/
-dataset_path: /home/student/dl2/grp5/cca5/dataset/workdir/data-debug.json
-devices: [ ]
 debug: False
+devices: [ ]
 
-epochs: 1
+dataset:
+  attributes_dir: ../../work/dataset/phono/3d
+  path: ../../work/dataset/data-debug.json
+  fields: [
+    orientation_dh,
+    orientation_ndh, 
+    handshape_dh, 
+    handshape_ndh, 
+    movement_dh_st, 
+    movement_ndh_st,
+    mouth_openness
+  ]
+  samples_min_freq: 2
+  vocab_min_freq: 2
+  max_len_sentence: 100
+  train_split_ratio: 0.7
+
+model:
+  N: 6
+  d_model: 512
+  d_ff: 2048
+  h: 8
+  dropout: 0.1
+
+training:
+  epochs: 100
+  batch_size: 50
+  warm_up: 400
+  lr: 0
+  betas: [0.9, 0.98]
+  eps: 0.000000001
