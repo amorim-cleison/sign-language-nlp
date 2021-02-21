@@ -215,49 +215,43 @@ def visualize_attention(model, trans, sent):
 
 def build_dataset(path, attributes_dir, fields, samples_min_freq,
                   max_len_sentence, train_split_ratio, vocab_min_freq,
-                  **kwargs):
-    """
-    SRC = data.Field(sequential=True,
-                     unk_token=UNK_WORD,
-                     pad_token=PAD_WORD)
-    TGT = data.Field(sequential=True,
-                     is_target=True,
-                     pad_first=True,
-                     init_token=BOS_WORD,
-                     eos_token=EOS_WORD,
-                     unk_token=UNK_WORD,
-                     pad_token=PAD_WORD)
+                  composition_strategy, **kwargs):
+    class FieldComposer:
+        def __init__(self, fields, strategy):
+            self.fields = fields
+            self.strategy = strategy
 
-    MAX_LEN = 100
-    dataset = data.TabularDataset(
-        path=f"{input_dir}\\data.json",
-        format="json",
-        fields={
-            'frames.movement_dh_st': ('src', SRC),
-            'label': ('trg', TGT)
-        },
-        filter_pred=lambda x: len(vars(x)['src']) <= MAX_LEN)
-    """
+        def compose_all_values(self, rows):
+            return list(
+                map(
+                    lambda row: "-".join([
+                        f"{(row[x]['value'] if row[x] else ''):<20}"
+                        for x in self.fields
+                    ]), rows))
 
-    # movement_dh_st':''
-    # 'movement_ndh_st':''
-    # 'orientation_dh':'back'
-    # 'orientation_ndh':'front'
-    # 'mouth_openness':0.5540059453054104
+        def compose_as_words(self, rows):
+            def compose_field(data):
+                return ''.join([k[0] for k in str(data['value']).split('_')
+                                ]) if data else ''
+            return list(
+                map(
+                    lambda row: "-".join(
+                        [compose_field(row[f]) for f in self.fields]), rows))
 
-    def compose_field(rows):
-        return list(
-            map(
-                lambda row: "-".join([
-                    f"{(row[x]['value'] if row[x] else ''):<20}"
-                    for x in fields
-                ]), rows))
-        # return list(map(lambda row: [row[x] for x in FIELDS], rows))
+        def run(self, rows):
+            fn = self.FIELD_COMPOSE_STRATEGY[self.strategy]
+            return fn(self, rows)
+
+        FIELD_COMPOSE_STRATEGY = {
+            "all_values": compose_all_values,
+            "as_words": compose_as_words
+        }
+
+    composer = FieldComposer(fields, composition_strategy)
 
     SRC = data.Field(sequential=True,
-                     unk_token=UNK_WORD,
                      pad_token=PAD_WORD,
-                     preprocessing=compose_field)
+                     preprocessing=composer.run)
     TGT = data.Field(sequential=True,
                      is_target=True,
                      pad_first=True,
