@@ -1,6 +1,11 @@
 debug: False
 devices: [ 0 ]
 
+transfer_learning:
+  enabled: False
+  model_path: ../../work/sl-transformer/transfer-model/iwslt.pt
+  model_url: https://s3.amazonaws.com/opennmt-models/iwslt.pt
+
 dataset:
   attributes_dir: ../../work/asllvd-skeleton/dataset/phono/3d
   path: ../../work/asllvd-skeleton/dataset/data-debug.json
@@ -34,4 +39,7 @@ training:
   betas: [0.9, 0.98]
   eps: 0.000000001
   label_smoothing: 0.1
-  log_interval: 5
+  log_steps_interval: 5
+  checkpoint_dir: ../../work/sl-transformer/checkpoint
+  checkpoint_interval: 1
+  checkpoint_last_only: True
