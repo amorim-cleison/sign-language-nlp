@@ -14,85 +14,137 @@ UNK_WORD = '<unk>'
 PAD_WORD = '<pad>'
 
 
-def run(devices, dataset, model, training, **kwargs):
-    CUDA_ENABLED = (devices is not None) and len(devices) > 0
+def run(devices_args, dataset_args, model_args, training_args,
+        transfer_learning_args, config_args, **kwargs):
+    CUDA_ENABLED = torch.cuda.is_available() and (
+        devices_args is not None) and len(devices_args) > 0
 
     # Dataset:
-    train_data, _, val_data, TGT, SRC = build_dataset(**dataset)
+    train_data, _, val_data, TGT, SRC = build_dataset(**dataset_args)
+    # model = load_learning(model, CUDA_ENABLED, **transfer_learning_args)
 
-    # Model:
-    model = make_model(len(SRC.vocab),
-                       len(TGT.vocab),
-                       cuda_enabled=CUDA_ENABLED,
-                       **training)
+    # Setup training:
+    training_objects = prepare_training(
+        cuda_enabled=CUDA_ENABLED,
+        devices=devices_args,
+        train_data=train_data,
+        valid_data=val_data,
+        TGT=TGT,
+        SRC=SRC,
+        model_args=model_args,
+        training_args=training_args,
+        checkpoint_path=training_args["checkpoint_path"])
 
     # Training:
-    run_training(model=model,
-                 devices=devices,
-                 train_data=train_data,
-                 valid_data=val_data,
-                 SRC=SRC,
-                 TGT=TGT,
-                 cuda_enabled=CUDA_ENABLED,
-                 **training)
+    run_training(cuda_enabled=CUDA_ENABLED,
+                 devices=devices_args,
+                 config_path=config_args,
+                 **training_args,
+                 **training_objects)
 
 
-def get_iter(dataset, batch_size, devices, train, pad_idx):
+def load_learning(model, cuda_enabled, enabled, model_path, model_url,
+                  **kwargs):
+    if enabled:
+        from commons.util import download_file
+
+        if not exists(model_path):
+            log(f"Downloading model from '{model_url}'...")
+            success = download_file(model_url, model_path, True)
+            assert success, "Failed to download model"
+
+        log(f"Loading model '{model_path}'...")
+        device = get_device(cuda_enabled)
+        return torch.load(model_path, map_location=device)
+    else:
+        return model
+
+
+def get_iter(dataset, batch_size, cuda_enabled, train, pad_idx):
     if dataset:
         return data.Iterator(dataset,
                              batch_size=batch_size,
-                             device=torch.device('cuda') if devices else None,
+                             device=get_device(cuda_enabled),
                              repeat=False,
                              sort_key=lambda x: (len(x.src), len(x.trg)),
                              train=train)
 
 
-def run_training(model, devices, epochs, train_data, valid_data, batch_size,
-                 SRC, TGT, cuda_enabled, warm_up, lr, betas, eps, log_interval,
-                 **kwargs):
+def prepare_training(cuda_enabled, devices, train_data, valid_data, TGT, SRC,
+                     model_args, training_args, checkpoint_path):
     pad_idx = TGT.vocab.stoi[PAD_WORD]
-    criterion = LabelSmoothing(size=len(TGT.vocab),
-                               padding_idx=pad_idx,
-                               smoothing=0.1)
-    if cuda_enabled:
-        criterion.cuda()
 
-    # Model parallelization:
-    model_par = nn.DataParallel(model, device_ids=devices)
+    # Criterion (label smoothing):
+    criterion = get_label_smoothing(vocab_size=len(TGT.vocab),
+                                    padding_idx=pad_idx,
+                                    cuda_enabled=cuda_enabled,
+                                    **training_args)
+
+    # Model:
+    model = make_model(len(SRC.vocab),
+                       len(TGT.vocab),
+                       cuda_enabled=cuda_enabled,
+                       **model_args)
 
     # Optimizer:
-    model_opt = NoamOpt(
-        model.src_embed[0].d_model, 1, warm_up,
-        torch.optim.Adam(model.parameters(),
-                         lr=lr,
-                         betas=tuple(betas),
-                         eps=eps))
+    model_opt = get_model_opt(model=model, **training_args)
+
+    # Loss compute:
+    loss_compute = get_loss_compute(model.generator, criterion, model_opt,
+                                    devices, cuda_enabled)
+
+    # Restore states:
+    last_epoch, model, model_opt = restore_states(checkpoint_path, model,
+                                                  model_opt)
+    next_epoch = 0 if (last_epoch is None) else (last_epoch + 1)
+
     # Iterators:
-    train_iter = get_iter(train_data, batch_size, devices, True, pad_idx)
-    valid_iter = get_iter(valid_data, batch_size, devices, False, pad_idx)
+    batch_size = training_args["batch_size"]
+    train_iter = get_iter(train_data, batch_size, cuda_enabled, True, pad_idx)
+    valid_iter = get_iter(valid_data, batch_size, cuda_enabled, False, pad_idx)
+
+    return {
+        "train_iter": train_iter,
+        "valid_iter": valid_iter,
+        "criterion": criterion,
+        "model": model,
+        "model_opt": model_opt,
+        "loss_compute": loss_compute,
+        "next_epoch": next_epoch,
+        "pad_idx": pad_idx,
+        "TGT": TGT,
+        "SRC": SRC
+    }
+
+
+def run_training(cuda_enabled, devices, epochs, train_iter, valid_iter,
+                 criterion, model, model_opt, loss_compute, next_epoch,
+                 checkpoint_interval, checkpoint_path, log_interval, pad_idx,
+                 SRC, TGT, config_path, **kwargs):
+    model_par = nn.DataParallel(model, device_ids=devices)
 
     # Run epochs:
-    for epoch in range(epochs):
-        log("")
-        log(("-" * 30))
-        log(f"EPOCH {epoch+1}", 1)
-
-        log("")
-        log("Training...", 2)
+    for epoch in range(next_epoch, epochs):
+        log_epoch(epoch + 1)
+        log_phase("Training")
         model_par.train()
-        run_epoch(data_iter=train_iter,
-                  model=model_par,
-                  loss_compute=get_loss_compute(model.generator, criterion,
-                                                model_opt, devices,
-                                                cuda_enabled),
-                  pad_idx=pad_idx,
-                  log_interval=log_interval)
+        loss = run_epoch(data_iter=train_iter,
+                         model=model_par,
+                         loss_compute=loss_compute,
+                         pad_idx=pad_idx,
+                         log_interval=log_interval)
 
+        # Save checkpoint:
+        if checkpoint_interval and ((epoch % checkpoint_interval) == 0 or
+                                    (epoch == (epochs - 1))):
+            save_checkpoint(checkpoint_path, config_path, epoch,
+                            model_par.module, model_opt, loss)
+
+        # Run validation:
         if valid_iter:
-            log("")
-            log("Evaluating...", 2)
+            log_phase("Evaluating")
 
-            # Verify loss:
+            # Loss:
             model_par.eval()
             loss = run_epoch(data_iter=valid_iter,
                              model=model_par,
@@ -103,9 +155,73 @@ def run_training(model, devices, epochs, train_data, valid_data, batch_size,
                              log_interval=None)
             log(f"  Loss: {loss:f}", 1)
 
-            # Verify accuracy
+            # Accuracy
             accuracy = calculate_accuracy(model, valid_iter, SRC, TGT)
             log(f"  Accuracy: {accuracy:f}", 1)
+
+
+def save_checkpoint(path, config_path, epoch, model, optimizer, loss):
+    from commons.util import directory, filename, is_dir, create_if_missing
+    from shutil import copyfile
+
+    log("Saving checkpoint...")
+
+    # Save states:
+    state = {
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss
+    }
+    create_if_missing(directory(path))
+    torch.save(state, path)
+
+    # Backup configs:
+    bkp_dir = path if is_dir(path) else directory(path)
+    bkp_path = normpath(f"{bkp_dir}/{filename(config_path)}")
+    copyfile(config_path, bkp_path)
+
+
+def restore_states(path, model, optimizer):
+    if exists(path):
+        log("Loading checkpoint...")
+        checkpoint = torch.load(path)
+        last_epoch = checkpoint["epoch"]
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    else:
+        last_epoch = None
+    return last_epoch, model, optimizer
+
+
+def log_phase(phase):
+    log("")
+    log(f"{phase}...")
+
+
+def log_epoch(epoch):
+    log("")
+    log(("-" * 30))
+    log(f"EPOCH {epoch}", 1)
+
+
+def get_label_smoothing(vocab_size, padding_idx, label_smoothing, cuda_enabled,
+                        **kwargs):
+    criterion = LabelSmoothing(size=vocab_size,
+                               padding_idx=padding_idx,
+                               smoothing=label_smoothing)
+    if cuda_enabled:
+        criterion.cuda()
+    return criterion
+
+
+def get_model_opt(model, warm_up, lr, betas, eps, **kwargs):
+    return NoamOpt(
+        model.src_embed[0].d_model, 1, warm_up,
+        torch.optim.Adam(model.parameters(),
+                         lr=lr,
+                         betas=tuple(betas),
+                         eps=eps))
 
 
 def get_loss_compute(model_generator, criterion, opt, devices, cuda_enabled):
@@ -118,7 +234,12 @@ def get_loss_compute(model_generator, criterion, opt, devices, cuda_enabled):
         return SimpleLossCompute(model_generator, criterion, opt)
 
 
-def calculate_accuracy(model, test_iter, SRC, TGT):
+def get_device(cuda_enabled):
+    device = "cuda" if cuda_enabled else "cpu"
+    return torch.device(device)
+
+
+def calculate_accuracy(model, test_iter, SRC, TGT, **kwargs):
     TO_IGNORE = [TGT.vocab.stoi[BOS_WORD], TGT.vocab.stoi[EOS_WORD]]
 
     def get_mask(tensor, to_ignore):
@@ -167,8 +288,9 @@ def visualize_attention(model, trans, sent):
     import seaborn
 
     # Attention Visualization
-    # Even with a greedy decoder the translation looks pretty good. We can further
-    # visualize it to see what is happening at each layer of the attention
+    # Even with a greedy decoder the translation looks pretty good. We can
+    # further # visualize it to see what is happening at each layer of the
+    # attention
 
     tgt_sent = trans.split()
 
@@ -233,6 +355,7 @@ def build_dataset(path, attributes_dir, fields, samples_min_freq,
             def compose_field(data):
                 return ''.join([k[0] for k in str(data['value']).split('_')
                                 ]) if data else ''
+
             return list(
                 map(
                     lambda row: "-".join(
@@ -273,6 +396,8 @@ def build_dataset(path, attributes_dir, fields, samples_min_freq,
             'label': ('trg', TGT)
         },
         filter_pred=lambda x: len(vars(x)['src']) <= max_len_sentence)
+    SRC.build_vocab(dataset.src, min_freq=vocab_min_freq)
+    TGT.build_vocab(dataset.trg, min_freq=vocab_min_freq)
 
     # ratios (parameter): [ train, test, val]
     # output: (train, [val,] test)
@@ -284,9 +409,6 @@ def build_dataset(path, attributes_dir, fields, samples_min_freq,
     else:
         train, test = splits
         val = None
-
-    SRC.build_vocab(dataset.src, min_freq=vocab_min_freq)
-    TGT.build_vocab(dataset.trg, min_freq=vocab_min_freq)
 
     return train, val, test, TGT, SRC
 
@@ -314,12 +436,12 @@ class NoamOpt:
     "Optim wrapper that implements rate."
 
     def __init__(self, model_size, factor, warmup, optimizer):
-        self.optimizer = optimizer
         self._step = 0
         self.warmup = warmup
         self.factor = factor
         self.model_size = model_size
         self._rate = 0
+        self.optimizer = optimizer
 
     def step(self):
         "Update parameters and rate"
@@ -336,6 +458,18 @@ class NoamOpt:
             step = self._step
         return self.factor * (self.model_size**(-0.5) *
                               min(step**(-0.5), step * self.warmup**(-1.5)))
+
+    def state_dict(self):
+        return {
+            "optimizer": self.optimizer.state_dict(),
+            "step": self._step,
+            "rate": self._rate
+        }
+
+    def load_state_dict(self, state):
+        self._rate = state["rate"]
+        self._step = state["step"]
+        self.optimizer.load_state_dict(state["optimizer"])
 
 
 # TODO: check where to move this code

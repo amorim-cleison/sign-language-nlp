@@ -1,6 +1,11 @@
 debug: False
 devices: [ ]
 
+transfer_learning:
+  enabled: False
+  model_path: ../../work/sl-transformer/transfer-model/iwslt.pt
+  model_url: https://s3.amazonaws.com/opennmt-models/iwslt.pt
+
 dataset:
   attributes_dir: ../../work/dataset/phono/3d
   path: ../../work/dataset/data-debug.json
@@ -29,8 +34,12 @@ model:
 training:
   epochs: 100
   batch_size: 50
-  warm_up: 400
+  warm_up: 400 # Original: 4000
   lr: 0
   betas: [0.9, 0.98]
   eps: 0.000000001
+  label_smoothing: 0.1
   log_interval: 5
+  checkpoint_path: ../../work/sl-transformer/checkpoint/weights.tar
+  checkpoint_interval: 1
+  checkpoint_last_only: True
