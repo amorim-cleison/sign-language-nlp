@@ -119,8 +119,8 @@ def prepare_training(cuda_enabled, devices, train_data, val_data, TGT, SRC,
 
 def run_training(cuda_enabled, devices, epochs, train_iter, val_iter,
                  criterion, model, model_opt, loss_compute, next_epoch,
-                 checkpoint_interval, checkpoint_dir, log_interval, pad_idx,
-                 SRC, TGT, config_path, **kwargs):
+                 checkpoint_interval, checkpoint_dir, log_steps_interval,
+                 pad_idx, SRC, TGT, config_path, **kwargs):
     model_par = nn.DataParallel(model, device_ids=devices)
 
     # Run epochs:
@@ -132,7 +132,7 @@ def run_training(cuda_enabled, devices, epochs, train_iter, val_iter,
                                model=model_par,
                                loss_compute=loss_compute,
                                pad_idx=pad_idx,
-                               log_interval=log_interval)
+                               log_steps_interval=log_steps_interval)
 
         # Save checkpoint:
         if checkpoint_interval and ((epoch % checkpoint_interval) == 0 or
@@ -152,7 +152,7 @@ def run_training(cuda_enabled, devices, epochs, train_iter, val_iter,
                                      model.generator, criterion, None, devices,
                                      cuda_enabled),
                                  pad_idx=pad_idx,
-                                 log_interval=None)
+                                 log_steps_interval=None)
             log(f"  Loss: {val_loss:f}", 1)
 
             # Accuracy
@@ -597,7 +597,7 @@ class LabelSmoothing(nn.Module):
         return self.criterion(x, Variable(true_dist, requires_grad=False))
 
 
-def run_epoch(data_iter, model, loss_compute, pad_idx, log_interval=5):
+def run_epoch(data_iter, model, loss_compute, pad_idx, log_steps_interval=5):
     "Standard Training and Logging Function"
     import time
 
@@ -614,7 +614,7 @@ def run_epoch(data_iter, model, loss_compute, pad_idx, log_interval=5):
         total_loss += loss
         total_tokens += batch.ntokens
         tokens += batch.ntokens
-        if log_interval and (i % log_interval) == 1:
+        if log_steps_interval and (i % log_steps_interval) == 1:
             elapsed = time.time() - start
             log("  Epoch Step: %d Loss: %f Tokens per Sec: %f" %
                 (i, loss / batch.ntokens, tokens / elapsed))
