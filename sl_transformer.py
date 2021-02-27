@@ -124,8 +124,10 @@ def run_training(cuda_enabled, devices, epochs, train_iter, val_iter,
     model_par = nn.DataParallel(model, device_ids=devices)
 
     # Run epochs:
-    for epoch in range(next_epoch, epochs):
-        log_epoch(epoch + 1)
+    for epoch_idx in range(next_epoch, epochs):
+        epoch = (epoch_idx + 1)
+        log_epoch(epoch)
+
         log_phase("Training")
         model_par.train()
         train_loss = run_epoch(data_iter=train_iter,
@@ -136,7 +138,7 @@ def run_training(cuda_enabled, devices, epochs, train_iter, val_iter,
 
         # Save checkpoint:
         if checkpoint_interval and ((epoch % checkpoint_interval) == 0 or
-                                    (epoch == (epochs - 1))):
+                                    (epoch == epochs)):
             save_checkpoint(checkpoint_dir, config_path, epoch,
                             model_par.module, model_opt, train_loss)
 
