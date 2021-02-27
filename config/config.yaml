@@ -40,6 +40,6 @@ training:
   eps: 0.000000001
   label_smoothing: 0.1
   log_interval: 5
-  checkpoint_path: ../../work/sl-transformer/checkpoint/weights.tar
+  checkpoint_dir: ../../work/sl-transformer/checkpoint
   checkpoint_interval: 1
   checkpoint_last_only: True

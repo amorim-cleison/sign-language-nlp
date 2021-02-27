@@ -28,12 +28,12 @@ def run(devices_args, dataset_args, model_args, training_args,
         cuda_enabled=CUDA_ENABLED,
         devices=devices_args,
         train_data=train_data,
-        valid_data=val_data,
+        val_data=val_data,
         TGT=TGT,
         SRC=SRC,
         model_args=model_args,
         training_args=training_args,
-        checkpoint_path=training_args["checkpoint_path"])
+        checkpoint_dir=training_args["checkpoint_dir"])
 
     # Training:
     run_training(cuda_enabled=CUDA_ENABLED,
@@ -70,8 +70,8 @@ def get_iter(dataset, batch_size, cuda_enabled, train, pad_idx):
                              train=train)
 
 
-def prepare_training(cuda_enabled, devices, train_data, valid_data, TGT, SRC,
-                     model_args, training_args, checkpoint_path):
+def prepare_training(cuda_enabled, devices, train_data, val_data, TGT, SRC,
+                     model_args, training_args, checkpoint_dir):
     pad_idx = TGT.vocab.stoi[PAD_WORD]
 
     # Criterion (label smoothing):
@@ -94,18 +94,18 @@ def prepare_training(cuda_enabled, devices, train_data, valid_data, TGT, SRC,
                                     devices, cuda_enabled)
 
     # Restore states:
-    last_epoch, model, model_opt = restore_states(checkpoint_path, model,
+    last_epoch, model, model_opt = restore_states(checkpoint_dir, model,
                                                   model_opt)
     next_epoch = 0 if (last_epoch is None) else (last_epoch + 1)
 
     # Iterators:
     batch_size = training_args["batch_size"]
     train_iter = get_iter(train_data, batch_size, cuda_enabled, True, pad_idx)
-    valid_iter = get_iter(valid_data, batch_size, cuda_enabled, False, pad_idx)
+    val_iter = get_iter(val_data, batch_size, cuda_enabled, False, pad_idx)
 
     return {
         "train_iter": train_iter,
-        "valid_iter": valid_iter,
+        "val_iter": val_iter,
         "criterion": criterion,
         "model": model,
         "model_opt": model_opt,
@@ -117,9 +117,9 @@ def prepare_training(cuda_enabled, devices, train_data, valid_data, TGT, SRC,
     }
 
 
-def run_training(cuda_enabled, devices, epochs, train_iter, valid_iter,
+def run_training(cuda_enabled, devices, epochs, train_iter, val_iter,
                  criterion, model, model_opt, loss_compute, next_epoch,
-                 checkpoint_interval, checkpoint_path, log_interval, pad_idx,
+                 checkpoint_interval, checkpoint_dir, log_interval, pad_idx,
                  SRC, TGT, config_path, **kwargs):
     model_par = nn.DataParallel(model, device_ids=devices)
 
@@ -128,43 +128,61 @@ def run_training(cuda_enabled, devices, epochs, train_iter, valid_iter,
         log_epoch(epoch + 1)
         log_phase("Training")
         model_par.train()
-        loss = run_epoch(data_iter=train_iter,
-                         model=model_par,
-                         loss_compute=loss_compute,
-                         pad_idx=pad_idx,
-                         log_interval=log_interval)
+        train_loss = run_epoch(data_iter=train_iter,
+                               model=model_par,
+                               loss_compute=loss_compute,
+                               pad_idx=pad_idx,
+                               log_interval=log_interval)
 
         # Save checkpoint:
         if checkpoint_interval and ((epoch % checkpoint_interval) == 0 or
                                     (epoch == (epochs - 1))):
-            save_checkpoint(checkpoint_path, config_path, epoch,
-                            model_par.module, model_opt, loss)
+            save_checkpoint(checkpoint_dir, config_path, epoch,
+                            model_par.module, model_opt, train_loss)
 
         # Run validation:
-        if valid_iter:
+        if val_iter:
             log_phase("Evaluating")
 
             # Loss:
             model_par.eval()
-            loss = run_epoch(data_iter=valid_iter,
-                             model=model_par,
-                             loss_compute=get_loss_compute(
-                                 model.generator, criterion, None, devices,
-                                 cuda_enabled),
-                             pad_idx=pad_idx,
-                             log_interval=None)
-            log(f"  Loss: {loss:f}", 1)
+            val_loss = run_epoch(data_iter=val_iter,
+                                 model=model_par,
+                                 loss_compute=get_loss_compute(
+                                     model.generator, criterion, None, devices,
+                                     cuda_enabled),
+                                 pad_idx=pad_idx,
+                                 log_interval=None)
+            log(f"  Loss: {val_loss:f}", 1)
 
             # Accuracy
-            accuracy = calculate_accuracy(model, valid_iter, SRC, TGT)
+            accuracy = calculate_accuracy(model, val_iter, SRC, TGT)
             log(f"  Accuracy: {accuracy:f}", 1)
 
+        # Save epoch log:
+        save_epoch_log(
+            checkpoint_dir, {
+                "epoch": epoch,
+                "lr": model_opt.lr,
+                "loss": val_loss.item(),
+                "accuracy": accuracy
+            })
 
-def save_checkpoint(path, config_path, epoch, model, optimizer, loss):
-    from commons.util import directory, filename, is_dir, create_if_missing
+
+def save_epoch_log(dir, data):
+    from commons.util import save_csv, create_if_missing
+    create_if_missing(dir)
+    log_path = normpath(f"{dir}/epochs_log.csv")
+    save_csv([data], log_path, append=True)
+
+
+def save_checkpoint(dir, config_path, epoch, model, optimizer, loss):
+    from commons.util import filename, create_if_missing
     from shutil import copyfile
 
     log("Saving checkpoint...")
+    weigths_path = normpath(f"{dir}/weights.tar")
+    bkp_configs_path = normpath(f"{dir}/{filename(config_path)}")
 
     # Save states:
     state = {
@@ -173,19 +191,19 @@ def save_checkpoint(path, config_path, epoch, model, optimizer, loss):
         'optimizer_state_dict': optimizer.state_dict(),
         'loss': loss
     }
-    create_if_missing(directory(path))
-    torch.save(state, path)
+    create_if_missing(dir)
+    torch.save(state, weigths_path)
 
     # Backup configs:
-    bkp_dir = path if is_dir(path) else directory(path)
-    bkp_path = normpath(f"{bkp_dir}/{filename(config_path)}")
-    copyfile(config_path, bkp_path)
+    copyfile(config_path, bkp_configs_path)
 
 
-def restore_states(path, model, optimizer):
-    if exists(path):
+def restore_states(dir, model, optimizer):
+    weigths_path = normpath(f"{dir}/weights.tar")
+
+    if exists(weigths_path):
         log("Loading checkpoint...")
-        checkpoint = torch.load(path)
+        checkpoint = torch.load(weigths_path)
         last_epoch = checkpoint["epoch"]
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -239,7 +257,7 @@ def get_device(cuda_enabled):
     return torch.device(device)
 
 
-def calculate_accuracy(model, test_iter, SRC, TGT, **kwargs):
+def calculate_accuracy(model, val_iter, SRC, TGT, **kwargs):
     TO_IGNORE = [TGT.vocab.stoi[BOS_WORD], TGT.vocab.stoi[EOS_WORD]]
 
     def get_mask(tensor, to_ignore):
@@ -261,7 +279,7 @@ def calculate_accuracy(model, test_iter, SRC, TGT, **kwargs):
     total = 0
     correct = 0
 
-    for i, batch in enumerate(test_iter):
+    for i, batch in enumerate(val_iter):
         with torch.no_grad():
             src = batch.src.transpose(0, 1)
             src_mask = (src != SRC.vocab.stoi[PAD_WORD]).unsqueeze(-2)
@@ -458,6 +476,10 @@ class NoamOpt:
             step = self._step
         return self.factor * (self.model_size**(-0.5) *
                               min(step**(-0.5), step * self.warmup**(-1.5)))
+
+    @property
+    def lr(self):
+        return self._rate
 
     def state_dict(self):
         return {
