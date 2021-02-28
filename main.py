@@ -1,5 +1,6 @@
 from sl_transformer import run
 from commons.util import Argument, load_args
+from commons.log import init_logger
 
 ARGUMENTS = [
     Argument('-d', '--debug', type=bool, help='Debug flag'),
@@ -15,5 +16,7 @@ ARGUMENTS = [
 
 if __name__ == "__main__":
     args = load_args('SL Transformer', ARGUMENTS)
+    init_logger(args)
+
     args = {f"{k}_args": v for (k, v) in vars(args).items()}
     run(**args)

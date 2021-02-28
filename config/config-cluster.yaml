@@ -1,5 +1,6 @@
 debug: False
 devices: [ 0 ]
+log: ../../work/sl-transformer/checkpoint/output.log
 
 transfer_learning:
   enabled: False

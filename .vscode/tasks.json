@@ -1,0 +1,33 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"detail": "Refresh Poetry",
+			"label": "refresh-poetry",
+			"dependsOn": "remove-commons",
+			"command": "poetry update commons-python"
+		},
+		{
+			"type": "shell",
+			"detail": "Remove `commons-python`",
+			"label": "remove-commons",
+			"command": "rm",
+			"linux": {
+				"args": [
+					"-rf",
+					"${workspaceFolder}/.venv/lib/python3.8/site-packages/commons_python-0.1.0.dist-info/"
+				]
+			},
+			"windows": {
+				"args": []
+			}
+		},
+		{
+			"type": "shell",
+			"detail": "Show log",
+			"label": "print-log",
+			"command": "tail -f ${workspaceFolder}/output.log"
+		}
+	]
+}

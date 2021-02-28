@@ -222,7 +222,7 @@ def log_phase(phase):
 def log_epoch(epoch):
     log("")
     log(("-" * 30))
-    log(f"EPOCH {epoch}", 1)
+    log(f"EPOCH {epoch}")
 
 
 def get_label_smoothing(vocab_size, padding_idx, label_smoothing, cuda_enabled,

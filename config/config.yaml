@@ -1,5 +1,6 @@
 debug: False
 devices: [ ]
+log: Null
 
 transfer_learning:
   enabled: False
