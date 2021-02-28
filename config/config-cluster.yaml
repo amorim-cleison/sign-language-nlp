@@ -8,7 +8,7 @@ transfer_learning:
 
 dataset:
   attributes_dir: ../../work/asllvd-skeleton/dataset/phono/3d
-  path: ../../work/asllvd-skeleton/dataset/data-debug.json
+  path: ../../work/asllvd-skeleton/dataset/data.json
   fields: [
     orientation_dh,
     orientation_ndh, 
@@ -21,7 +21,7 @@ dataset:
   samples_min_freq: 2
   vocab_min_freq: 2
   max_len_sentence: 100
-  train_split_ratio: 0.7
+  train_split_ratio: 0.8
   composition_strategy: as_words
 
 model:
@@ -34,12 +34,12 @@ model:
 training:
   epochs: 500
   batch_size: 50
-  warm_up: 400
+  warm_up: 4000
   lr: 0
   betas: [0.9, 0.98]
   eps: 0.000000001
   label_smoothing: 0.1
   log_steps_interval: 5
   checkpoint_dir: ../../work/sl-transformer/checkpoint
-  checkpoint_interval: 1
+  checkpoint_interval: 10
   checkpoint_last_only: True
