@@ -1,4 +1,5 @@
-from sl_transformer import run
+# from sl_transformer import run
+from sl_transformer_torch import run
 from commons.util import Argument, load_args
 from commons.log import init_logger
 
