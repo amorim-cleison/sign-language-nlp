@@ -62,12 +62,12 @@ def load_learning(model, cuda_enabled, enabled, model_path, model_url,
 
 def get_iter(dataset, batch_size, cuda_enabled, train, pad_idx):
     if dataset:
-        return data.Iterator(dataset,
-                             batch_size=batch_size,
-                             device=get_device(cuda_enabled),
-                             repeat=False,
-                             sort_key=lambda x: (len(x.src), len(x.trg)),
-                             train=train)
+        return MyIterator(dataset,
+                          batch_size=batch_size,
+                          device=0,
+                          repeat=False,
+                          sort_key=lambda x: (len(x.src), len(x.trg)),
+                          train=train)
 
 
 def prepare_training(cuda_enabled, devices, train_data, val_data, TGT, SRC,
@@ -140,26 +140,27 @@ def run_training(cuda_enabled, devices, epochs, train_iter, val_iter,
         if checkpoint_interval and ((epoch % checkpoint_interval) == 0 or
                                     (epoch == epochs)):
             save_checkpoint(checkpoint_dir, config_path, epoch,
-                            model_par.module, model_opt, train_loss)
+                            model_par, model_opt, train_loss)
 
         # Run validation:
         if val_iter:
             log_phase("Evaluating")
-
-            # Loss:
             model_par.eval()
-            val_loss = run_epoch(data_iter=val_iter,
-                                 model=model_par,
-                                 loss_compute=get_loss_compute(
-                                     model.generator, criterion, None, devices,
-                                     cuda_enabled),
-                                 pad_idx=pad_idx,
-                                 log_steps_interval=None)
-            log(f"  Loss: {val_loss:f}", 1)
 
-            # Accuracy
-            accuracy = calculate_accuracy(model, val_iter, SRC, TGT)
-            log(f"  Accuracy: {accuracy:f}", 1)
+            with torch.no_grad():
+                # Loss:
+                val_loss = run_epoch(data_iter=val_iter,
+                                     model=model_par,
+                                     loss_compute=get_loss_compute(
+                                         model.generator, criterion, None,
+                                         devices, cuda_enabled),
+                                     pad_idx=pad_idx,
+                                     log_steps_interval=None)
+                log(f"  Loss: {val_loss:f}", 1)
+
+                # Accuracy
+                accuracy = calculate_accuracy(model_par, val_iter, SRC, TGT)
+                log(f"  Accuracy: {accuracy:f}", 1)
 
         # Save epoch log:
         save_epoch_log(
@@ -235,10 +236,10 @@ def get_label_smoothing(vocab_size, padding_idx, label_smoothing, cuda_enabled,
     return criterion
 
 
-def get_model_opt(model, warm_up, lr, betas, eps, **kwargs):
+def get_model_opt(model_par, warm_up, lr, betas, eps, **kwargs):
     return NoamOpt(
-        model.src_embed[0].d_model, 1, warm_up,
-        torch.optim.Adam(model.parameters(),
+        model_par.module.src_embed[0].d_model, 1, warm_up,
+        torch.optim.Adam(model_par.parameters(),
                          lr=lr,
                          betas=tuple(betas),
                          eps=eps))
@@ -276,21 +277,20 @@ def calculate_accuracy(model, val_iter, SRC, TGT, **kwargs):
     # Here we simply translate the first sentence in the validation set.
     # This dataset is pretty small so the translations with greedy search
     # are reasonably accurate.
-    model.eval()
+    # model.eval()
 
     total = 0
     correct = 0
 
     for i, batch in enumerate(val_iter):
-        with torch.no_grad():
-            src = batch.src.transpose(0, 1)
-            src_mask = (src != SRC.vocab.stoi[PAD_WORD]).unsqueeze(-2)
-            out = greedy_decode(model,
-                                src,
-                                src_mask,
-                                max_len=60,
-                                start_symbol=TGT.vocab.stoi[BOS_WORD],
-                                end_symbol=TGT.vocab.stoi[EOS_WORD])
+        src = batch.src.transpose(0, 1)
+        src_mask = (src != SRC.vocab.stoi[PAD_WORD]).unsqueeze(-2)
+        out = greedy_decode(model,
+                            src,
+                            src_mask,
+                            max_len=60,
+                            start_symbol=TGT.vocab.stoi[BOS_WORD],
+                            end_symbol=TGT.vocab.stoi[EOS_WORD])
 
         tgt = batch.trg.transpose(0, 1)
         correct_items = [
@@ -509,8 +509,10 @@ class SimpleLossCompute:
         x = self.generator(x)
         loss = self.criterion(x.contiguous().view(-1, x.size(-1)),
                               y.contiguous().view(-1)) / norm
-        loss.backward()
         if self.opt is not None:
+            # FIXME: the source code seems to be using backward() 
+            # out of this block, which is a bug
+            loss.backward()
             self.opt.step()
             self.opt.optimizer.zero_grad()
         # return loss.data[0] * norm
@@ -616,7 +618,7 @@ def run_epoch(data_iter, model, loss_compute, pad_idx, log_steps_interval=5):
         total_loss += loss
         total_tokens += batch.ntokens
         tokens += batch.ntokens
-        if log_steps_interval and (i % log_steps_interval) == 1:
+        if log_steps_interval and (i % log_steps_interval) == 0:
             elapsed = time.time() - start
             log("  Epoch Step: %d Loss: %f Tokens per Sec: %f" %
                 (i, loss / batch.ntokens, tokens / elapsed))
@@ -641,6 +643,26 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol, end_symbol):
         if all(next_word == end_symbol):
             break
     return ys
+
+
+class MyIterator(data.Iterator):
+    def create_batches(self):
+        if self.train:
+
+            def pool(d, random_shuffler):
+                for p in data.batch(d, self.batch_size * 100):
+                    p_batch = data.batch(sorted(p, key=self.sort_key),
+                                         self.batch_size, self.batch_size_fn)
+                    for b in random_shuffler(list(p_batch)):
+                        yield b
+
+            self.batches = pool(self.data(), self.random_shuffler)
+
+        else:
+            self.batches = []
+            for b in data.batch(self.data(), self.batch_size,
+                                self.batch_size_fn):
+                self.batches.append(sorted(b, key=self.sort_key))
 
 
 def rebatch(pad_idx, batch):
