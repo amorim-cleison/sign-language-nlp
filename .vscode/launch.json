@@ -5,13 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Main",
+            "name": "Run Main",
             "type": "python",
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
             "preLaunchTask": "refresh-poetry"
+        },
+        {
+            "name": "Run Main + Commons",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }

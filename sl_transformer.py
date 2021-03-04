@@ -94,7 +94,7 @@ def prepare_training(cuda_enabled, devices, train_data, val_data, TGT, SRC,
                                     devices, cuda_enabled)
 
     # Restore states:
-    last_epoch, model, model_opt = restore_states(checkpoint_dir, model,
+    last_epoch, model, / = restore_states(checkpoint_dir, model,
                                                   model_opt)
     next_epoch = 0 if (last_epoch is None) else (last_epoch + 1)
 

@@ -1,5 +1,5 @@
 debug: False
-devices: [ ]
+# devices: [ ]
 log: Null
 
 transfer_learning:
@@ -40,7 +40,7 @@ training:
   betas: [0.9, 0.98]
   eps: 0.000000001
   label_smoothing: 0.1
-  log_steps_interval: 5
+  log_interval: 5
   checkpoint_dir: ../../work/sl-transformer/checkpoint
   checkpoint_interval: 1
   checkpoint_last_only: True
