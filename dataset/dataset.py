@@ -11,13 +11,19 @@ UNK_WORD = '<unk>'
 PAD_WORD = '<pad>'
 
 
-def build_dataset(path, train_split_ratio, **kwargs):
+def build_dataset(path, train_split_ratio, val_split_ratio=None, **kwargs):
     dataset = __provide_dataset(path=path, **kwargs)
+
+    if not val_split_ratio:
+        val_split_ratio = 0
+    assert (train_split_ratio + val_split_ratio <=
+            1), "Invalid train/val split ratios."
+    test_split_ratio = 1 - train_split_ratio - val_split_ratio
 
     # ratios (parameter): [ train, test, val]
     # output: (train, [val,] test)
     splits = dataset.split(
-        split_ratio=[train_split_ratio, 1 - train_split_ratio])
+        split_ratio=[train_split_ratio, test_split_ratio, val_split_ratio])
 
     if len(splits) == 3:
         train, val, test = splits
@@ -57,12 +63,12 @@ def __provide_dataset(path, attributes_dir, samples_min_freq, max_len_sentence,
         format="json",
         fields={
             'phonos': ('src', SRC),
-            'label': ('trg', TGT)
+            'label': ('tgt', TGT)
         },
         filter_pred=lambda x: len(vars(x)['src']) <= max_len_sentence)
 
     SRC.build_vocab(dataset.src, min_freq=vocab_min_freq)
-    TGT.build_vocab(dataset.trg, min_freq=vocab_min_freq)
+    TGT.build_vocab(dataset.tgt, min_freq=vocab_min_freq)
 
     return dataset
 
@@ -100,5 +106,5 @@ def build_iterator(dataset, batch_size, device, train):
                           batch_size=batch_size,
                           device=device,
                           repeat=False,
-                          sort_key=lambda x: (len(x.src), len(x.trg)),
+                          sort_key=lambda x: (len(x.src), len(x.tgt)),
                           train=train)

@@ -10,8 +10,7 @@
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
-            "justMyCode": false,
-            "preLaunchTask": "refresh-poetry"
+            "justMyCode": false
         },
         {
             "name": "Run Main + Commons",
@@ -19,7 +18,8 @@
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "preLaunchTask": "refresh-poetry"
         }
     ]
 }

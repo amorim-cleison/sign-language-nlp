@@ -50,69 +50,89 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-class TransformerModel(nn.Module):
-    """Container module with an encoder, a recurrent or transformer module, and a decoder."""
-
-    from torch import Tensor
+class CustomModel(nn.Module):
     from typing import Optional
+    from torch import Tensor
 
-    def __init__(self,
-                 d_model,
-                 nhead,
-                 dim_feedforward,
-                 num_encoder_layers,
-                 src_vocab_size,
-                 dropout=0.5):
-        super(TransformerModel, self).__init__()
-        try:
-            from torch.nn import TransformerEncoder, TransformerEncoderLayer
-        except:
-            raise ImportError(
-                'TransformerEncoder module does not exist in PyTorch 1.1 or lower.'
-            )
-        self.model_type = 'Transformer'
-        # self.src_mask = None
-        self.pos_encoder = PositionalEncoding(d_model, dropout)
-        encoder_layers = TransformerEncoderLayer(d_model, nhead,
-                                                 dim_feedforward, dropout)
-        self.transformer_encoder = TransformerEncoder(encoder_layers,
-                                                      num_encoder_layers)
-        self.encoder = nn.Embedding(src_vocab_size, d_model)
+    def __init__(self, d_model, nhead, num_encoder_layers, num_decoder_layers,
+                 dim_feedforward, dropout, src_vocab, tgt_vocab, pad_word,
+                 **kwargs):
+        super(CustomModel, self).__init__()
         self.d_model = d_model
-        self.decoder = nn.Linear(d_model, src_vocab_size)
-
-        self.init_weights()
-
-    def _generate_square_subsequent_mask(self, sz):
-        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(
-            mask == 1, float(0.0))
-        return mask
-
-    def init_weights(self):
-        initrange = 0.1
-        nn.init.uniform_(self.encoder.weight, -initrange, initrange)
-        nn.init.zeros_(self.decoder.weight)
-        nn.init.uniform_(self.decoder.weight, -initrange, initrange)
+        self.pad_word = pad_word
+        self.src_vocab = src_vocab
+        self.tgt_vocab = tgt_vocab
+        self.src_embedding = nn.Embedding(len(src_vocab), d_model)
+        self.src_pos_encoding = PositionalEncoding(d_model, dropout)
+        self.tgt_embedding = nn.Embedding(len(tgt_vocab), d_model)
+        self.tgt_pos_encoding = PositionalEncoding(d_model, dropout)
+        self.transformer = nn.Transformer(d_model, nhead, num_encoder_layers,
+                                          num_decoder_layers, dim_feedforward,
+                                          dropout)
+        self.linear = nn.Linear(d_model, len(tgt_vocab))
+        self.softmax = nn.functional.log_softmax
 
     def forward(self,
                 src: Tensor,
                 tgt: Tensor,
-                mask: Optional[Tensor] = None,
-                src_key_padding_mask: Optional[Tensor] = None,
-                tgt_key_padding_mask: Optional[Tensor] = None,
-                memory_key_padding_mask: Optional[Tensor] = None) -> Tensor:
-        # if has_mask:
-        #     device = src.device
-        #     if self.src_mask is None or self.src_mask.size(0) != len(src):
-        #         mask = self._generate_square_subsequent_mask(
-        #             len(src)).to(device)
-        #         self.src_mask = mask
-        # else:
-        #     self.src_mask = None
+                memory_mask: Optional[Tensor] = None,
+                memory_key_padding_mask: Optional[Tensor] = None):
+        # Attention masks:
+        src_mask = None
+        tgt_mask = self.generate_mask(tgt)
 
-        src = self.encoder(src) * math.sqrt(self.d_model)
-        src = self.pos_encoder(src)
-        output = self.transformer_encoder(src, mask, src_key_padding_mask)
-        output = self.decoder(output)
-        return F.log_softmax(output, dim=-1)
+        # Padding masks:
+        src_padding_mask = self.generate_padding_mask(src, self.src_vocab)
+        tgt_padding_mask = self.generate_padding_mask(tgt, self.tgt_vocab)
+
+        # Embeddings:
+        src_embed = self.forward_embedding(src, self.src_embedding,
+                                           self.src_pos_encoding)
+        tgt_embed = self.forward_embedding(tgt, self.tgt_embedding,
+                                           self.tgt_pos_encoding)
+
+        # Forward:
+        output = self.transformer(
+            src=src_embed,
+            tgt=tgt_embed,
+            src_mask=src_mask,
+            tgt_mask=tgt_mask,
+            memory_mask=memory_mask,
+            src_key_padding_mask=src_padding_mask,
+            tgt_key_padding_mask=tgt_padding_mask,
+            memory_key_padding_mask=memory_key_padding_mask)
+        output = self.linear(output)
+        output = self.softmax(output, dim=-1)
+        return output
+
+    def forward_embedding(self, x, embedding, pos_encoding):
+        x = embedding(x) * math.sqrt(self.d_model)
+        x = pos_encoding(x)
+        return x
+
+    def generate_mask(self, data):
+        """
+        Mask ensures that position i is allowed to attend the unmasked
+        positions. If a ByteTensor is provided, the non-zero positions are
+        not allowed to attend while the zero positions will be unchanged.
+        If a BoolTensor is provided, positions with ``True`` are not
+        allowed to attend while ``False`` values will be unchanged.
+        If a FloatTensor is provided, it will be added to the attention
+        weight.
+        """
+        mask = self.transformer.generate_square_subsequent_mask(data.size(0))
+        mask = (mask != float(0.0)).bool()
+        return mask
+
+    def generate_padding_mask(self, data, vocab):
+        """
+        Padding mask provides specified elements in the key to be ignored
+        by the attention. If a ByteTensor is provided, the non-zero
+        positions will be ignored while the zero positions will be
+        unchanged. If a BoolTensor is provided, the positions with the
+        value of ``True`` will be ignored while the position with the
+        value of ``False`` will be unchanged.
+        """
+        pad_idx = vocab.stoi[self.pad_word]
+        mask = (data == pad_idx).transpose(0, 1).bool()
+        return mask
