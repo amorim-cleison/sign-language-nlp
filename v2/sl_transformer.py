@@ -163,7 +163,7 @@ def run_test(criterion, test_data, checkpoint_dir, **kwargs):
                                    data_source=test_data,
                                    **kwargs)
     step_data = {
-        "acc": f"{test_loss:5.2f}",
+        "acc": f"{test_acc:5.2f}",
         "loss": f"{test_loss:5.2f}",
         "ppl": f"{math.exp(test_loss):8.2f}"
     }
