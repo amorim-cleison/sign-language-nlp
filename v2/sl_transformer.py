@@ -120,17 +120,18 @@ def run_training(model, epochs, criterion, optimizer, scheduler, train_data,
                   log_interval=log_interval,
                   **kwargs)
 
-            val_loss = evaluate(model=model,
-                                criterion=criterion,
-                                data_source=val_data,
-                                **kwargs)
+            val_loss, val_acc = evaluate(model=model,
+                                         criterion=criterion,
+                                         data_source=val_data,
+                                         **kwargs)
 
-            log('-' * 89)
+            log('-' * 100)
             log(f'| end of epoch {epoch:3d} '
                 f'| time: {(time.time() - epoch_start_time):5.2f}s '
+                f'| valid acc {val_acc:5.2f} '
                 f'| valid loss {val_loss:5.2f} '
                 f'| valid ppl {math.exp(val_loss):8.2f}')
-            log('-' * 89)
+            log('-' * 100)
 
             # Save the model if the validation loss is the best we've seen so
             # far.
@@ -153,20 +154,23 @@ def run_test(criterion, test_data, checkpoint_dir, **kwargs):
         model = torch.load(f)
 
     # Run on test data.
-    test_loss = evaluate(model=model,
-                         criterion=criterion,
-                         data_source=test_data,
-                         **kwargs)
-    log('=' * 89)
-    log(f'| End of training | test loss {test_loss:5.2f} '
+    test_loss, test_acc = evaluate(model=model,
+                                   criterion=criterion,
+                                   data_source=test_data,
+                                   **kwargs)
+    log('=' * 100)
+    log(f'| End of training '
+        f'| test acc {test_loss:5.2f}'
+        f'| test loss {test_loss:5.2f} '
         f'| test ppl {math.exp(test_loss):8.2f}')
-    log('=' * 89)
+    log('=' * 100)
 
 
 def evaluate(model, criterion, data_source, **kwargs):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     total_loss = 0.
+    total_correct = 0
     batches = get_batches(data=data_source, train=False, **kwargs)
 
     with torch.no_grad():
@@ -175,10 +179,18 @@ def evaluate(model, criterion, data_source, **kwargs):
             output = model.forward(data, targets)
             output = output.view(-1, output.size(-1))
             targets = targets.view(-1)
+
+            # Loss:
             # TODO: review this:
             # total_loss += len(data) * criterion(output, targets).item()
             total_loss += data.size(-1) * criterion(output, targets).item()
-    return total_loss / (len(data_source) - 1)
+
+            # Accuracy:
+            total_correct += (torch.argmax(output, dim=-1) == targets).sum()
+
+    loss = total_loss / (len(data_source) - 1)
+    accuracy = total_correct / (len(data_source) - 1)
+    return loss, accuracy
 
 
 def train(epoch, model, data_source, criterion, optimizer, scheduler,
@@ -206,7 +218,7 @@ def train(epoch, model, data_source, criterion, optimizer, scheduler,
             cur_loss = total_loss / log_interval
             elapsed = time.time() - start_time
             log(f'| epoch {epoch:3d} | {i:5d}/{len(batches):5d} batches '
-                f'| lr {scheduler.get_last_lr()[0]:02.2f} '
+                f'| lr {scheduler.get_last_lr()[0]:02.5f} '
                 f'| ms/batch {elapsed * 1000 / log_interval:5.2f} '
                 f'| loss {cur_loss:5.2f} | ppl {math.exp(cur_loss):8.2f}')
             total_loss = 0
