@@ -1,17 +1,19 @@
 import math
+
 import torch.nn as nn
+
 from .positional_encoding import PositionalEncoding
 
 
 class CustomModel(nn.Module):
     from typing import Optional
+
     from torch import Tensor
 
     def __init__(self, d_model, nhead, num_encoder_layers, num_decoder_layers,
                  dim_feedforward, dropout, src_vocab, tgt_vocab, pad_word,
-                 device, **kwargs):
+                 **kwargs):
         super(CustomModel, self).__init__()
-        self.device = device
         self.d_model = d_model
         self.pad_word = pad_word
         self.src_vocab = src_vocab
@@ -25,16 +27,22 @@ class CustomModel(nn.Module):
                                           dropout)
         self.linear = nn.Linear(d_model, len(tgt_vocab))
         self.softmax = nn.functional.log_softmax
-        self.to(device)
+
+    def to(self, device):
+        self.device = device
+        self.src_embedding = self.src_embedding.to(self.device)
+        self.src_pos_encoding = self.src_pos_encoding.to(self.device)
+        self.tgt_embedding = self.tgt_embedding.to(self.device)
+        self.tgt_pos_encoding = self.tgt_pos_encoding.to(self.device)
+        self.transformer = self.transformer.to(self.device)
+        self.linear = self.linear.to(self.device)
+        return super().to(device)
 
     def forward(self,
                 src: Tensor,
                 tgt: Tensor,
                 memory_mask: Optional[Tensor] = None,
                 memory_key_padding_mask: Optional[Tensor] = None):
-        src = src.to(self.device)
-        tgt = tgt.to(self.device)
-
         # Attention masks:
         src_mask = None
         tgt_mask = self.generate_mask(tgt).to(self.device)
@@ -81,7 +89,7 @@ class CustomModel(nn.Module):
         weight.
         """
         mask = self.transformer.generate_square_subsequent_mask(data.size(0))
-        mask = (mask != float(0.0)).bool()
+        mask = (mask != float(0.0)).transpose(0, 1).bool()
         return mask
 
     def generate_padding_mask(self, data, vocab):
