@@ -36,25 +36,17 @@ def run(mode, seed, cuda, config, dataset_args, model_args, training_args,
                         tgt_vocab=tgt_vocab,
                         **model_args)
 
-    criterion = build_criterion(mode=mode,
-                                tgt_vocab=tgt_vocab,
-                                pad_word=PAD_WORD,
-                                device=device,
-                                **training_args)
-    optimizer = build_optimizer(
-        mode=mode,
-        model=model,
-        **model_args,
-        **training_args,
-    )
+    criterion = build_criterion(**training_args)
+    optimizer = build_optimizer(model=model, **training_args)
+    scheduler = build_scheduler(optimizer=optimizer, **training_args)
 
     ###########################################################################
     # Training code
     ###########################################################################
-    run_training(mode=mode,
-                 model=model,
+    run_training(model=model,
                  criterion=criterion,
-                 optmizer=optimizer,
+                 optimizer=optimizer,
+                 scheduler=scheduler,
                  train_data=train_data,
                  val_data=val_data,
                  device=device,
@@ -75,34 +67,21 @@ def get_batches(data, device, batch_size, train, **kwargs):
     return data_iter
 
 
-def build_optimizer(mode, model, d_model, warm_up, lr, betas, eps, **kwargs):
-    if mode == "old":
-        from .loss import NoamOpt
-        adam = torch.optim.Adam(model.parameters(),
-                                lr=lr,
-                                betas=tuple(betas),
-                                eps=eps)
-        optimizer = NoamOpt(model_size=d_model,
-                            factor=1,
-                            warmup=warm_up,
-                            optimizer=adam,
-                            **kwargs)
-    else:
-        optimizer = None
-    return optimizer
+def build_optimizer(model, lr, betas, eps, **kwargs):
+    return torch.optim.SGD(model.parameters(), lr=lr)
+    # return torch.optim.Adam(model.parameters(),
+    #                         lr=lr,
+    #                         betas=tuple(betas),
+    #                         eps=eps)
 
 
-def build_criterion(mode, tgt_vocab, label_smoothing, pad_word, device,
-                    **kwargs):
-    if mode == "bkp":
-        from .loss import LabelSmoothingLoss
-        pad_idx = tgt_vocab.stoi[pad_word]
-        criterion = LabelSmoothingLoss(size=len(tgt_vocab),
-                                       padding_idx=pad_idx,
-                                       smoothing=label_smoothing).to(device)
-    else:
-        criterion = nn.NLLLoss()
-    return criterion
+def build_scheduler(optimizer, **kwargs):
+    return torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
+
+
+def build_criterion(**kwargs):
+    # return nn.NLLLoss()
+    return nn.CrossEntropyLoss()
 
 
 def build_model(device, N, d_model, d_ff, h, dropout, src_vocab, tgt_vocab,
@@ -117,31 +96,33 @@ def build_model(device, N, d_model, d_ff, h, dropout, src_vocab, tgt_vocab,
                         dropout=dropout,
                         src_vocab=src_vocab,
                         tgt_vocab=tgt_vocab,
-                        pad_word=PAD_WORD,
-                        device=device)
+                        pad_word=PAD_WORD).to(device)
     return nn.DataParallel(model)
 
 
-def run_training(mode, model, epochs, criterion, optmizer, train_data,
-                 val_data, lr, log_interval, checkpoint_dir, **kwargs):
-    # Loop over epochs.
-    # lr = args.lr
-    best_val_loss = None
+def run_training(model, epochs, criterion, optimizer, scheduler, train_data,
+                 val_data, log_interval, checkpoint_dir, **kwargs):
+    best_val_loss = float("inf")
     save = normpath(f"{checkpoint_dir}/weights.pt")
 
     # At any point you can hit Ctrl + C to break out of training early.
     try:
         for epoch in range(1, epochs + 1):
             epoch_start_time = time.time()
+            train(epoch=epoch,
+                  model=model,
+                  data_source=train_data,
+                  criterion=criterion,
+                  optimizer=optimizer,
+                  scheduler=scheduler,
+                  log_interval=log_interval,
+                  **kwargs)
 
-            if mode == "old":
-                train_with_optmizer(epoch, model, train_data, criterion,
-                                    optmizer, lr, log_interval, **kwargs)
-            else:
-                train(epoch, model, train_data, criterion, lr, log_interval,
-                      **kwargs)
+            val_loss = evaluate(model=model,
+                                criterion=criterion,
+                                data_source=val_data,
+                                **kwargs)
 
-            val_loss = evaluate(model, criterion, val_data, **kwargs)
             log('-' * 89)
             log(f'| end of epoch {epoch:3d} '
                 f'| time: {(time.time() - epoch_start_time):5.2f}s '
@@ -151,14 +132,12 @@ def run_training(mode, model, epochs, criterion, optmizer, train_data,
 
             # Save the model if the validation loss is the best we've seen so
             # far.
-            if not best_val_loss or val_loss < best_val_loss:
+            if val_loss < best_val_loss:
                 with open(save, 'wb') as f:
                     torch.save(model, f)
                 best_val_loss = val_loss
-            else:
-                # Anneal the learning rate if no improvement has been seen in
-                # the validation dataset.
-                lr /= 4.0
+
+            scheduler.step()
     except KeyboardInterrupt:
         log('-' * 89)
         log('Exiting from training early')
@@ -177,8 +156,8 @@ def run_test(criterion, test_data, checkpoint_dir, **kwargs):
                          data_source=test_data,
                          **kwargs)
     log('=' * 89)
-    log('| End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
-        test_loss, math.exp(test_loss)))
+    log(f'| End of training | test loss {test_loss:5.2f} '
+        f'| test ppl {math.exp(test_loss):8.2f}')
     log('=' * 89)
 
 
@@ -200,29 +179,24 @@ def evaluate(model, criterion, data_source, **kwargs):
     return total_loss / (len(data_source) - 1)
 
 
-def train(epoch, model, train_data, criterion, lr, log_interval, **kwargs):
+def train(epoch, model, data_source, criterion, optimizer, scheduler,
+          log_interval, **kwargs):
     # Turn on training mode which enables dropout.
     model.train()
     total_loss = 0.
     start_time = time.time()
-    batches = get_batches(data=train_data, train=True, **kwargs)
+    batches = get_batches(data=data_source, train=True, **kwargs)
 
     for i, batch in enumerate(batches):
         data, targets = batch.src, batch.tgt
-
-        # Starting each batch, we detach the hidden state from how it was
-        # previously produced.
-        # If we didn't, the model would try backpropagating all the way to
-        # start of the dataset.
-        model.zero_grad()
+        optimizer.zero_grad()
         output = model.forward(data, targets)
         output = output.view(-1, output.size(-1))
         targets = targets.view(-1)
         loss = criterion(output, targets)
         loss.backward()
-
-        for p in model.parameters():
-            p.data.add_(p.grad, alpha=-lr)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+        optimizer.step()
 
         total_loss += loss.item()
 
@@ -230,50 +204,7 @@ def train(epoch, model, train_data, criterion, lr, log_interval, **kwargs):
             cur_loss = total_loss / log_interval
             elapsed = time.time() - start_time
             log(f'| epoch {epoch:3d} | {i:5d}/{len(batches):5d} batches '
-                f'| lr {lr:02.2f} '
-                f'| ms/batch {elapsed * 1000 / log_interval:5.2f} '
-                f'| loss {cur_loss:5.2f} | ppl {math.exp(cur_loss):8.2f}')
-            total_loss = 0
-            start_time = time.time()
-
-
-def train_with_optmizer(epoch, model, train_data, criterion, optimizer, lr,
-                        log_interval, **kwargs):
-    # Turn on training mode which enables dropout.
-    model.train()
-    total_loss = 0.
-    start_time = time.time()
-    batches = get_batches(data=train_data, train=True, **kwargs)
-
-    for i, batch in enumerate(batches):
-        data, targets = batch.src, batch.tgt
-
-        # Starting each batch, we detach the hidden state from how it was
-        # previously produced.
-        # If we didn't, the model would try backpropagating all the way to
-        # start of the dataset.
-        # model.zero_grad()  # FIXME: Removed line
-        optimizer.zero_grad()  # FIXME: New line
-
-        output = model.forward(data, targets)
-        output = output.view(-1, output.size(-1))
-        targets = targets.view(-1)
-        loss = criterion(output, targets)
-        loss.backward()
-
-        optimizer.step()  # FIXME: New line
-
-        # for p in model.parameters():  # FIXME: Removed line
-        #     p.data.add_(p.grad, alpha=-lr)  # FIXME: Removed line
-
-        total_loss += loss.item()
-
-        if i % log_interval == 0 and i > 0:
-            cur_loss = total_loss / log_interval
-            elapsed = time.time() - start_time
-            log(f'| epoch {epoch:3d} | {i:5d}/{len(batches):5d} batches '
-                # f'| lr {lr:02.2f} ' # FIXME: Removed line
-                f'| lr {optimizer.lr:02.6f} '  # FIXME: New line
+                f'| lr {scheduler.get_last_lr()[0]:02.2f} '
                 f'| ms/batch {elapsed * 1000 / log_interval:5.2f} '
                 f'| loss {cur_loss:5.2f} | ppl {math.exp(cur_loss):8.2f}')
             total_loss = 0

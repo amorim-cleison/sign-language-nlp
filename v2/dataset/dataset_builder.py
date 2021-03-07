@@ -42,16 +42,14 @@ def __provide_dataset(path, attributes_dir, samples_min_freq, max_len_sentence,
     # Create fields:
     composer = FieldComposer(fields, composition_strategy)
 
-    SRC = data.Field(sequential=True,
-                     pad_token=PAD_WORD,
-                     preprocessing=composer.run)
-    TGT = data.Field(sequential=True,
-                     is_target=True,
-                     pad_first=True,
-                     init_token=BOS_WORD,
-                     eos_token=EOS_WORD,
-                     unk_token=UNK_WORD,
-                     pad_token=PAD_WORD)
+    SRC = data.Field(pad_token=PAD_WORD, preprocessing=composer.run)
+    TGT = data.Field(
+        is_target=True,
+        pad_first=True,
+        #  init_token=BOS_WORD,
+        #  eos_token=EOS_WORD,
+        unk_token=UNK_WORD,
+        pad_token=PAD_WORD)
 
     # Create dataset:
     dataset = data.TabularDataset(
