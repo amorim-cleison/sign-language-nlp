@@ -14,8 +14,8 @@ def run(mode, seed, cuda, config, dataset_args, model_args, training_args,
 
     if torch.cuda.is_available():
         if not cuda:
-            log("WARNING: You have a CUDA device, so you should \
-                probably run with --cuda")
+            log("WARNING: You have a CUDA device, so you should probably "
+                "run with --cuda")
 
     device = torch.device("cuda" if cuda else "cpu")
 
@@ -117,7 +117,8 @@ def build_model(device, N, d_model, d_ff, h, dropout, src_vocab, tgt_vocab,
                         dropout=dropout,
                         src_vocab=src_vocab,
                         tgt_vocab=tgt_vocab,
-                        pad_word=PAD_WORD).to(device)
+                        pad_word=PAD_WORD,
+                        device=device)
     return nn.DataParallel(model)
 
 

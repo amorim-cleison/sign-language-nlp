@@ -9,8 +9,9 @@ class CustomModel(nn.Module):
 
     def __init__(self, d_model, nhead, num_encoder_layers, num_decoder_layers,
                  dim_feedforward, dropout, src_vocab, tgt_vocab, pad_word,
-                 **kwargs):
+                 device, **kwargs):
         super(CustomModel, self).__init__()
+        self.device = device
         self.d_model = d_model
         self.pad_word = pad_word
         self.src_vocab = src_vocab
@@ -24,6 +25,7 @@ class CustomModel(nn.Module):
                                           dropout)
         self.linear = nn.Linear(d_model, len(tgt_vocab))
         self.softmax = nn.functional.log_softmax
+        self.to(device)
 
     def forward(self,
                 src: Tensor,
@@ -75,7 +77,7 @@ class CustomModel(nn.Module):
         """
         mask = self.transformer.generate_square_subsequent_mask(data.size(0))
         mask = (mask != float(0.0)).bool()
-        return mask
+        return mask.to(self.device)
 
     def generate_padding_mask(self, data, vocab):
         """
@@ -88,4 +90,4 @@ class CustomModel(nn.Module):
         """
         pad_idx = vocab.stoi[self.pad_word]
         mask = (data == pad_idx).transpose(0, 1).bool()
-        return mask
+        return mask.to(self.device)
