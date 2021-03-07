@@ -68,16 +68,18 @@ def get_batches(data, device, batch_size, train, **kwargs):
     return data_iter
 
 
-def build_optimizer(model, lr, betas, eps, **kwargs):
-    return torch.optim.SGD(model.parameters(), lr=lr)
+def build_optimizer(model, lr, **kwargs):
     # return torch.optim.Adam(model.parameters(),
     #                         lr=lr,
     #                         betas=tuple(betas),
     #                         eps=eps)
+    return torch.optim.SGD(model.parameters(), lr=lr)
 
 
-def build_scheduler(optimizer, **kwargs):
-    return torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
+def build_scheduler(optimizer, lr_step_size, lr_step_gamma, **kwargs):
+    return torch.optim.lr_scheduler.StepLR(optimizer,
+                                           step_size=lr_step_size,
+                                           gamma=lr_step_gamma)
 
 
 def build_criterion(**kwargs):
@@ -134,8 +136,8 @@ def run_training(model, epochs, criterion, optimizer, scheduler, train_data,
                 "loss": f"{val_loss:5.2f}",
                 "ppl": f"{math.exp(val_loss):8.2f}"
             }
-            log_step("valid",  sep="-", **step_data)
-            save_step("valid", checkpoint_dir, **step_data)
+            log_step("valid", sep="-", **step_data)
+            # save_step("valid", checkpoint_dir, **step_data)
 
             # Save the model if the validation loss is the best we've seen so
             # far.
@@ -175,7 +177,7 @@ def evaluate(model, criterion, data_source, **kwargs):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     total_loss = 0.
-    total_correct = 0
+    total_acc = 0
     batches = get_batches(data=data_source, train=False, **kwargs)
 
     with torch.no_grad():
@@ -191,10 +193,11 @@ def evaluate(model, criterion, data_source, **kwargs):
             total_loss += data.size(-1) * criterion(output, targets).item()
 
             # Accuracy:
-            total_correct += (torch.argmax(output, dim=-1) == targets).sum()
+            # FIXME: analyze this. calculation considers BOS token
+            total_acc += calc_accuracy(output, targets)
 
     loss = total_loss / (len(data_source) - 1)
-    accuracy = total_correct / (len(data_source) - 1)
+    accuracy = total_acc / len(batches)
     return loss, accuracy
 
 
@@ -234,3 +237,7 @@ def train(epoch, model, data_source, criterion, optimizer, scheduler,
             save_step("train", checkpoint_dir, **step_data)
             total_loss = 0
             start_time = time.time()
+
+
+def calc_accuracy(output, targets):
+    return (torch.argmax(output, dim=-1) == targets).sum() / len(targets)

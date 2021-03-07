@@ -89,7 +89,7 @@ class CustomModel(nn.Module):
         weight.
         """
         mask = self.transformer.generate_square_subsequent_mask(data.size(0))
-        mask = (mask != float(0.0)).transpose(0, 1).bool()
+        mask = (mask != float(0.0)).bool()
         return mask
 
     def generate_padding_mask(self, data, vocab):
