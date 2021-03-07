@@ -32,13 +32,18 @@ class CustomModel(nn.Module):
                 tgt: Tensor,
                 memory_mask: Optional[Tensor] = None,
                 memory_key_padding_mask: Optional[Tensor] = None):
+        src = src.to(self.device)
+        tgt = tgt.to(self.device)
+
         # Attention masks:
         src_mask = None
-        tgt_mask = self.generate_mask(tgt)
+        tgt_mask = self.generate_mask(tgt).to(self.device)
 
         # Padding masks:
-        src_padding_mask = self.generate_padding_mask(src, self.src_vocab)
-        tgt_padding_mask = self.generate_padding_mask(tgt, self.tgt_vocab)
+        src_padding_mask = self.generate_padding_mask(src, self.src_vocab).to(
+            self.device)
+        tgt_padding_mask = self.generate_padding_mask(tgt, self.tgt_vocab).to(
+            self.device)
 
         # Embeddings:
         src_embed = self.forward_embedding(src, self.src_embedding,
@@ -77,7 +82,7 @@ class CustomModel(nn.Module):
         """
         mask = self.transformer.generate_square_subsequent_mask(data.size(0))
         mask = (mask != float(0.0)).bool()
-        return mask.to(self.device)
+        return mask
 
     def generate_padding_mask(self, data, vocab):
         """
@@ -90,4 +95,4 @@ class CustomModel(nn.Module):
         """
         pad_idx = vocab.stoi[self.pad_word]
         mask = (data == pad_idx).transpose(0, 1).bool()
-        return mask.to(self.device)
+        return mask
