@@ -86,8 +86,10 @@ def build_criterion(**kwargs):
 
 def build_model(device, N, d_model, d_ff, h, dropout, src_vocab, tgt_vocab,
                 **kwargs):
-    from .model import CustomModel
+    def to_parallel(model, device):
+        return nn.DataParallel(model) if (device.type == "cuda") else model
 
+    from .model import CustomModel
     model = CustomModel(d_model=d_model,
                         nhead=h,
                         num_encoder_layers=N,
@@ -97,7 +99,7 @@ def build_model(device, N, d_model, d_ff, h, dropout, src_vocab, tgt_vocab,
                         src_vocab=src_vocab,
                         tgt_vocab=tgt_vocab,
                         pad_word=PAD_WORD).to(device)
-    return nn.DataParallel(model)
+    return to_parallel(model, device)
 
 
 def run_training(model, epochs, criterion, optimizer, scheduler, train_data,
