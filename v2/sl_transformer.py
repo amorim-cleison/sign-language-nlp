@@ -146,7 +146,7 @@ def run_training(model, epochs, criterion, optimizer, scheduler, train_data,
 
             scheduler.step()
     except KeyboardInterrupt:
-        log('-' * 89)
+        log('-' * 100)
         log('Exiting from training early')
 
 
