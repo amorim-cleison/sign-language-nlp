@@ -46,7 +46,7 @@ def __provide_dataset(path, attributes_dir, samples_min_freq, max_len_sentence,
     TGT = data.Field(
         is_target=True,
         pad_first=True,
-        #  init_token=BOS_WORD,
+        init_token=BOS_WORD,
         #  eos_token=EOS_WORD,
         unk_token=UNK_WORD,
         pad_token=PAD_WORD)
