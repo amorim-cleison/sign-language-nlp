@@ -4,11 +4,10 @@ import torch
 import torch.nn as nn
 from commons.log import log
 from commons.util import normpath
-
 from .dataset import build_dataset, build_iterator, PAD_WORD
 
 
-def run(seed, cuda, config, dataset_args, model_args, training_args,
+def run(mode, seed, cuda, config, dataset_args, model_args, training_args,
         transfer_learning_args, **kwargs):
     # Set the random seed manually for reproducibility.
     torch.manual_seed(seed)
@@ -37,13 +36,25 @@ def run(seed, cuda, config, dataset_args, model_args, training_args,
                         tgt_vocab=tgt_vocab,
                         **model_args)
 
-    criterion = nn.NLLLoss()  # FIXME: replace by the LabelSmoothing
+    criterion = build_criterion(mode=mode,
+                                tgt_vocab=tgt_vocab,
+                                pad_word=PAD_WORD,
+                                device=device,
+                                **training_args)
+    optimizer = build_optimizer(
+        mode=mode,
+        model=model,
+        **model_args,
+        **training_args,
+    )
 
     ###########################################################################
     # Training code
     ###########################################################################
-    run_training(model=model,
+    run_training(mode=mode,
+                 model=model,
                  criterion=criterion,
+                 optmizer=optimizer,
                  train_data=train_data,
                  val_data=val_data,
                  device=device,
@@ -64,6 +75,36 @@ def get_batches(data, device, batch_size, train, **kwargs):
     return data_iter
 
 
+def build_optimizer(mode, model, d_model, warm_up, lr, betas, eps, **kwargs):
+    if mode == "old":
+        from .loss import NoamOpt
+        adam = torch.optim.Adam(model.parameters(),
+                                lr=lr,
+                                betas=tuple(betas),
+                                eps=eps)
+        optimizer = NoamOpt(model_size=d_model,
+                            factor=1,
+                            warmup=warm_up,
+                            optimizer=adam,
+                            **kwargs)
+    else:
+        optimizer = None
+    return optimizer
+
+
+def build_criterion(mode, tgt_vocab, label_smoothing, pad_word, device,
+                    **kwargs):
+    if mode == "bkp":
+        from .loss import LabelSmoothingLoss
+        pad_idx = tgt_vocab.stoi[pad_word]
+        criterion = LabelSmoothingLoss(size=len(tgt_vocab),
+                                       padding_idx=pad_idx,
+                                       smoothing=label_smoothing).to(device)
+    else:
+        criterion = nn.NLLLoss()
+    return criterion
+
+
 def build_model(device, N, d_model, d_ff, h, dropout, src_vocab, tgt_vocab,
                 **kwargs):
     from .model import CustomModel
@@ -80,8 +121,8 @@ def build_model(device, N, d_model, d_ff, h, dropout, src_vocab, tgt_vocab,
     return nn.DataParallel(model)
 
 
-def run_training(model, epochs, criterion, train_data, val_data, lr,
-                 log_interval, checkpoint_dir, **kwargs):
+def run_training(mode, model, epochs, criterion, optmizer, train_data,
+                 val_data, lr, log_interval, checkpoint_dir, **kwargs):
     # Loop over epochs.
     # lr = args.lr
     best_val_loss = None
@@ -91,8 +132,14 @@ def run_training(model, epochs, criterion, train_data, val_data, lr,
     try:
         for epoch in range(1, epochs + 1):
             epoch_start_time = time.time()
-            train(epoch, model, train_data, criterion, lr, log_interval,
-                  **kwargs)
+
+            if mode == "old":
+                train_with_optmizer(epoch, model, train_data, criterion,
+                                    optmizer, lr, log_interval, **kwargs)
+            else:
+                train(epoch, model, train_data, criterion, lr, log_interval,
+                      **kwargs)
+
             val_loss = evaluate(model, criterion, val_data, **kwargs)
             log('-' * 89)
             log(f'| end of epoch {epoch:3d} '
@@ -189,7 +236,7 @@ def train(epoch, model, train_data, criterion, lr, log_interval, **kwargs):
             start_time = time.time()
 
 
-def train_with_optmizer(epoch, model, train_data, criterion, optmizer, lr,
+def train_with_optmizer(epoch, model, train_data, criterion, optimizer, lr,
                         log_interval, **kwargs):
     # Turn on training mode which enables dropout.
     model.train()
@@ -204,8 +251,8 @@ def train_with_optmizer(epoch, model, train_data, criterion, optmizer, lr,
         # previously produced.
         # If we didn't, the model would try backpropagating all the way to
         # start of the dataset.
-        model.zero_grad()
-        optmizer.zero_grad()  # FIXME: New line
+        # model.zero_grad()  # FIXME: Removed line
+        optimizer.zero_grad()  # FIXME: New line
 
         output = model.forward(data, targets)
         output = output.view(-1, output.size(-1))
@@ -213,7 +260,7 @@ def train_with_optmizer(epoch, model, train_data, criterion, optmizer, lr,
         loss = criterion(output, targets)
         loss.backward()
 
-        optmizer.step()  # FIXME: New line
+        optimizer.step()  # FIXME: New line
 
         # for p in model.parameters():  # FIXME: Removed line
         #     p.data.add_(p.grad, alpha=-lr)  # FIXME: Removed line
@@ -224,7 +271,8 @@ def train_with_optmizer(epoch, model, train_data, criterion, optmizer, lr,
             cur_loss = total_loss / log_interval
             elapsed = time.time() - start_time
             log(f'| epoch {epoch:3d} | {i:5d}/{len(batches):5d} batches '
-                f'| lr {lr:02.2f} '
+                # f'| lr {lr:02.2f} ' # FIXME: Removed line
+                f'| lr {optimizer.lr:02.6f} '  # FIXME: New line
                 f'| ms/batch {elapsed * 1000 / log_interval:5.2f} '
                 f'| loss {cur_loss:5.2f} | ppl {math.exp(cur_loss):8.2f}')
             total_loss = 0

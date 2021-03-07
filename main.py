@@ -5,6 +5,7 @@ from commons.log import init_logger
 
 ARGUMENTS = [
     Argument('-d', '--debug', type=bool, help='Debug flag'),
+    Argument('-m', '--mode', type=str, help='Mode'),
     Argument('-s', '--seed', type=int, help='Random seed for reproducibility'),
     Argument('-nv', '--cuda', type=bool, default=False, help='Enable cuda'),
     Argument('-ds', '--dataset', type=dict, help='Options for the dataset'),

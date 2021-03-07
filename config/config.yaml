@@ -1,6 +1,7 @@
 seed: 1
 debug: False
 log: Null
+mode: old
 
 transfer_learning:
   enabled: False
@@ -37,7 +38,7 @@ training:
   epochs: 1 # Original: 100
   batch_size: 50
   warm_up: 400 # Original: 4000
-  lr: 0.01 # Original: 0.0
+  lr: 0.0
   betas: [0.9, 0.98]
   eps: 0.000000001
   label_smoothing: 0.1
