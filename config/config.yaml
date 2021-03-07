@@ -1,5 +1,5 @@
+seed: 1
 debug: False
-# devices: [ ]
 log: Null
 
 transfer_learning:

@@ -5,7 +5,7 @@ import torch.nn as nn
 from commons.log import log
 from commons.util import normpath
 
-from dataset import build_dataset, build_iterator, PAD_WORD
+from .dataset import build_dataset, build_iterator, PAD_WORD
 
 
 def run(seed, cuda, config, dataset_args, model_args, training_args,
@@ -66,17 +66,8 @@ def get_batches(data, device, batch_size, train, **kwargs):
 
 def build_model(device, N, d_model, d_ff, h, dropout, src_vocab, tgt_vocab,
                 **kwargs):
-    from transformer_model import CustomModel
+    from .model import CustomModel
 
-    # return CustomModel(d_model=d_model,
-    #                    nhead=h,
-    #                    num_encoder_layers=N,
-    #                    num_decoder_layers=N,
-    #                    dim_feedforward=d_ff,
-    #                    dropout=dropout,
-    #                    src_vocab=src_vocab,
-    #                    tgt_vocab=tgt_vocab,
-    #                    pad_word=PAD_WORD).to(device)
     model = CustomModel(d_model=d_model,
                         nhead=h,
                         num_encoder_layers=N,
@@ -184,6 +175,48 @@ def train(epoch, model, train_data, criterion, lr, log_interval, **kwargs):
 
         for p in model.parameters():
             p.data.add_(p.grad, alpha=-lr)
+
+        total_loss += loss.item()
+
+        if i % log_interval == 0 and i > 0:
+            cur_loss = total_loss / log_interval
+            elapsed = time.time() - start_time
+            log(f'| epoch {epoch:3d} | {i:5d}/{len(batches):5d} batches '
+                f'| lr {lr:02.2f} '
+                f'| ms/batch {elapsed * 1000 / log_interval:5.2f} '
+                f'| loss {cur_loss:5.2f} | ppl {math.exp(cur_loss):8.2f}')
+            total_loss = 0
+            start_time = time.time()
+
+
+def train_with_optmizer(epoch, model, train_data, criterion, optmizer, lr,
+                        log_interval, **kwargs):
+    # Turn on training mode which enables dropout.
+    model.train()
+    total_loss = 0.
+    start_time = time.time()
+    batches = get_batches(data=train_data, train=True, **kwargs)
+
+    for i, batch in enumerate(batches):
+        data, targets = batch.src, batch.tgt
+
+        # Starting each batch, we detach the hidden state from how it was
+        # previously produced.
+        # If we didn't, the model would try backpropagating all the way to
+        # start of the dataset.
+        model.zero_grad()
+        optmizer.zero_grad()  # FIXME: New line
+
+        output = model.forward(data, targets)
+        output = output.view(-1, output.size(-1))
+        targets = targets.view(-1)
+        loss = criterion(output, targets)
+        loss.backward()
+
+        optmizer.step()  # FIXME: New line
+
+        # for p in model.parameters():  # FIXME: Removed line
+        #     p.data.add_(p.grad, alpha=-lr)  # FIXME: Removed line
 
         total_loss += loss.item()
 
