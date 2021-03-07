@@ -5,6 +5,7 @@ import torch.nn as nn
 from commons.log import log
 from commons.util import normpath
 from .dataset import build_dataset, build_iterator, PAD_WORD
+from .util import log_step, save_step
 
 
 def run(mode, seed, cuda, config, dataset_args, model_args, training_args,
@@ -118,6 +119,7 @@ def run_training(model, epochs, criterion, optimizer, scheduler, train_data,
                   optimizer=optimizer,
                   scheduler=scheduler,
                   log_interval=log_interval,
+                  checkpoint_dir=checkpoint_dir,
                   **kwargs)
 
             val_loss, val_acc = evaluate(model=model,
@@ -125,13 +127,15 @@ def run_training(model, epochs, criterion, optimizer, scheduler, train_data,
                                          data_source=val_data,
                                          **kwargs)
 
-            log('-' * 100)
-            log(f'| end of epoch {epoch:3d} '
-                f'| time: {(time.time() - epoch_start_time):5.2f}s '
-                f'| valid acc {val_acc:5.2f} '
-                f'| valid loss {val_loss:5.2f} '
-                f'| valid ppl {math.exp(val_loss):8.2f}')
-            log('-' * 100)
+            step_data = {
+                "epoch": f"{epoch:3d}",
+                "time": f"{(time.time() - epoch_start_time):5.2f}s",
+                "acc": f"{val_acc:5.2f}",
+                "loss": f"{val_loss:5.2f}",
+                "ppl": f"{math.exp(val_loss):8.2f}"
+            }
+            log_step("valid",  sep="-", **step_data)
+            save_step("valid", checkpoint_dir, **step_data)
 
             # Save the model if the validation loss is the best we've seen so
             # far.
@@ -158,12 +162,13 @@ def run_test(criterion, test_data, checkpoint_dir, **kwargs):
                                    criterion=criterion,
                                    data_source=test_data,
                                    **kwargs)
-    log('=' * 100)
-    log(f'| End of training '
-        f'| test acc {test_loss:5.2f}'
-        f'| test loss {test_loss:5.2f} '
-        f'| test ppl {math.exp(test_loss):8.2f}')
-    log('=' * 100)
+    step_data = {
+        "acc": f"{test_loss:5.2f}",
+        "loss": f"{test_loss:5.2f}",
+        "ppl": f"{math.exp(test_loss):8.2f}"
+    }
+    log_step("test", sep="=", **step_data)
+    save_step("test", checkpoint_dir, **step_data)
 
 
 def evaluate(model, criterion, data_source, **kwargs):
@@ -194,7 +199,7 @@ def evaluate(model, criterion, data_source, **kwargs):
 
 
 def train(epoch, model, data_source, criterion, optimizer, scheduler,
-          log_interval, **kwargs):
+          log_interval, checkpoint_dir, **kwargs):
     # Turn on training mode which enables dropout.
     model.train()
     total_loss = 0.
@@ -217,9 +222,15 @@ def train(epoch, model, data_source, criterion, optimizer, scheduler,
         if i % log_interval == 0 and i > 0:
             cur_loss = total_loss / log_interval
             elapsed = time.time() - start_time
-            log(f'| epoch {epoch:3d} | {i:5d}/{len(batches):5d} batches '
-                f'| lr {scheduler.get_last_lr()[0]:02.5f} '
-                f'| ms/batch {elapsed * 1000 / log_interval:5.2f} '
-                f'| loss {cur_loss:5.2f} | ppl {math.exp(cur_loss):8.2f}')
+            step_data = {
+                "epoch": f"{epoch:3d}",
+                "batch": f"{i:5d} /{len(batches):5d}",
+                "lr": f"{scheduler.get_last_lr()[0]:02.5f}",
+                "ms/batch": f"{elapsed * 1000 / log_interval:5.2f}",
+                "loss": f"{cur_loss:5.2f}",
+                "ppl": f"{math.exp(cur_loss):8.2f}"
+            }
+            log_step("train", **step_data)
+            save_step("train", checkpoint_dir, **step_data)
             total_loss = 0
             start_time = time.time()
