@@ -26,8 +26,7 @@ def run(mode, seed, cuda, config, dataset_args, model_args, training_args,
     train_data, val_data, test_data = load_data(device=device,
                                                 **dataset_args,
                                                 **training_args)
-    src_vocab = train_data.fields["src"].vocab
-    tgt_vocab = train_data.fields["tgt"].vocab
+    src_vocab, tgt_vocab = get_vocabs(train_data)
 
     ###########################################################################
     # Build the model
@@ -63,9 +62,12 @@ def load_data(batch_size, device, **kwargs):
     return build_dataset(**kwargs)
 
 
+def get_vocabs(dataset):
+    return dataset.fields["src"].vocab, dataset.fields["tgt"].vocab
+
+
 def get_batches(data, device, batch_size, train, **kwargs):
-    data_iter = build_iterator(data, batch_size, device, train)
-    return data_iter
+    return build_iterator(data, batch_size, device, train)
 
 
 def build_optimizer(model, lr, **kwargs):
@@ -99,9 +101,8 @@ def build_model(device, N, d_model, d_ff, h, dropout, src_vocab, tgt_vocab,
                         num_decoder_layers=N,
                         dim_feedforward=d_ff,
                         dropout=dropout,
-                        src_vocab=src_vocab,
-                        tgt_vocab=tgt_vocab,
-                        pad_word=PAD_WORD).to(device)
+                        src_ntoken=len(src_vocab),
+                        tgt_ntoken=len(tgt_vocab)).to(device)
     return to_parallel(model, device)
 
 
@@ -173,49 +174,87 @@ def run_test(criterion, test_data, checkpoint_dir, **kwargs):
     save_step("test", checkpoint_dir, **step_data)
 
 
-def evaluate(model, criterion, data_source, **kwargs):
+def evaluate(model, criterion, data_source, device, **kwargs):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     total_loss = 0.
     total_acc = 0
-    batches = get_batches(data=data_source, train=False, **kwargs)
+    src_vocab, tgt_vocab = get_vocabs(data_source)
+    batches = get_batches(data=data_source,
+                          train=False,
+                          device=device,
+                          **kwargs)
 
     with torch.no_grad():
         for i, batch in enumerate(batches):
-            data, targets = batch.src, batch.tgt
-            output = model.forward(data, targets)
+            # Data:
+            src, tgt = batch.src, batch.tgt
+
+            # Masks:
+            src_mask = None
+            tgt_mask = generate_mask(tgt, model).to(device)
+            src_padding_mask = generate_padding_mask(src, src_vocab).to(device)
+            tgt_padding_mask = generate_padding_mask(tgt, tgt_vocab).to(device)
+
+            # Forward:
+            output = model.forward(src=src,
+                                   tgt=tgt,
+                                   src_mask=src_mask,
+                                   tgt_mask=tgt_mask,
+                                   src_key_padding_mask=src_padding_mask,
+                                   tgt_key_padding_mask=tgt_padding_mask)
             output = output.view(-1, output.size(-1))
-            targets = targets.view(-1)
+            tgt = tgt.view(-1)
 
             # Loss:
-            # TODO: review this:
+            # TODO: review this. This was done once the loss was nn.NLLLoss()
             # total_loss += len(data) * criterion(output, targets).item()
-            total_loss += data.size(-1) * criterion(output, targets).item()
+            total_loss += criterion(output, tgt).item()
 
             # Accuracy:
             # FIXME: analyze this. calculation considers BOS token
-            total_acc += calc_accuracy(output, targets)
+            total_acc += calc_accuracy(output, tgt)
 
-    loss = total_loss / (len(data_source) - 1)
+    loss = total_loss / len(batches)
     accuracy = total_acc / len(batches)
     return loss, accuracy
 
 
 def train(epoch, model, data_source, criterion, optimizer, scheduler,
-          log_interval, checkpoint_dir, **kwargs):
+          log_interval, checkpoint_dir, device, **kwargs):
     # Turn on training mode which enables dropout.
     model.train()
     total_loss = 0.
     start_time = time.time()
-    batches = get_batches(data=data_source, train=True, **kwargs)
+    src_vocab, tgt_vocab = get_vocabs(data_source)
+    batches = get_batches(data=data_source,
+                          train=True,
+                          device=device,
+                          **kwargs)
 
     for i, batch in enumerate(batches):
-        data, targets = batch.src, batch.tgt
+        # Data:
+        src, tgt = batch.src, batch.tgt
+
+        # Masks:
+        src_mask = None
+        tgt_mask = generate_mask(tgt, model).to(device)
+        src_padding_mask = generate_padding_mask(src, src_vocab).to(device)
+        tgt_padding_mask = generate_padding_mask(tgt, tgt_vocab).to(device)
+
+        # Forward step:
         optimizer.zero_grad()
-        output = model.forward(data, targets)
+        output = model.forward(src=src,
+                               tgt=tgt,
+                               src_mask=src_mask,
+                               tgt_mask=tgt_mask,
+                               src_key_padding_mask=src_padding_mask,
+                               tgt_key_padding_mask=tgt_padding_mask)
         output = output.view(-1, output.size(-1))
-        targets = targets.view(-1)
-        loss = criterion(output, targets)
+        tgt = tgt.view(-1)
+
+        # Loss and optimization:
+        loss = criterion(output, tgt)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
         optimizer.step()
@@ -241,3 +280,32 @@ def train(epoch, model, data_source, criterion, optimizer, scheduler,
 
 def calc_accuracy(output, targets):
     return (torch.argmax(output, dim=-1) == targets).sum() / len(targets)
+
+
+def generate_mask(data, model):
+    """
+    Mask ensures that position i is allowed to attend the unmasked
+    positions. If a ByteTensor is provided, the non-zero positions are
+    not allowed to attend while the zero positions will be unchanged.
+    If a BoolTensor is provided, positions with ``True`` are not
+    allowed to attend while ``False`` values will be unchanged.
+    If a FloatTensor is provided, it will be added to the attention
+    weight.
+    """
+    mask = model.generate_square_subsequent_mask(data.size(0))
+    mask = (mask != float(0.0)).bool()
+    return mask
+
+
+def generate_padding_mask(data, vocab):
+    """
+    Padding mask provides specified elements in the key to be ignored
+    by the attention. If a ByteTensor is provided, the non-zero
+    positions will be ignored while the zero positions will be
+    unchanged. If a BoolTensor is provided, the positions with the
+    value of ``True`` will be ignored while the position with the
+    value of ``False`` will be unchanged.
+    """
+    pad_idx = vocab.stoi[PAD_WORD]
+    mask = (data == pad_idx).transpose(0, 1).bool()
+    return mask
