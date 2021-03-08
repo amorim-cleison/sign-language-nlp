@@ -6,9 +6,17 @@ from commons.log import log
 from commons.util import normpath
 from .dataset import build_dataset, build_iterator, PAD_WORD
 from .util import log_step, save_step
+"""
+This code was base on the link:
+- https://pytorch.org/tutorials/beginner/transformer_tutorial.html
+
+Other links:
+- https://github.com/pytorch/examples/tree/master/word_language_model
+- http://nlp.seas.harvard.edu/2018/04/03/attention.html
+"""
 
 
-def run(mode, seed, cuda, config, dataset_args, model_args, training_args,
+def run(seed, cuda, config, dataset_args, model_args, training_args,
         transfer_learning_args, **kwargs):
     # Set the random seed manually for reproducibility.
     torch.manual_seed(seed)

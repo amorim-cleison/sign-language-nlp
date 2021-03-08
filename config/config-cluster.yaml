@@ -2,7 +2,6 @@ cuda: True
 seed: 1
 debug: False
 log: ../../work/sl-transformer/checkpoint/output.log
-mode: old
 
 transfer_learning:
   enabled: False

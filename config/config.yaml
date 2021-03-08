@@ -1,7 +1,6 @@
 seed: 1
 debug: False
 log: Null
-mode: old
 
 transfer_learning:
   enabled: False
