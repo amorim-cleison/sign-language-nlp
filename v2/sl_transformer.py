@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 from commons.log import log
 from commons.util import normpath
-from .dataset import build_dataset, build_iterator, PAD_WORD
-from .util import log_step, save_step
+from .dataset import build_dataset, build_iterator
+from .util import log_step, save_step, generate_mask, generate_padding_mask
 """
 This code was base on the link:
 - https://pytorch.org/tutorials/beginner/transformer_tutorial.html
@@ -288,45 +288,3 @@ def train(epoch, model, data_source, criterion, optimizer, scheduler,
 
 def calc_accuracy(output, targets):
     return (torch.argmax(output, dim=-1) == targets).sum() / len(targets)
-
-
-def generate_mask(data, model):
-    """
-    Mask ensures that position i is allowed to attend the unmasked
-    positions. If a ByteTensor is provided, the non-zero positions are
-    not allowed to attend while the zero positions will be unchanged.
-    If a BoolTensor is provided, positions with ``True`` are not
-    allowed to attend while ``False`` values will be unchanged.
-    If a FloatTensor is provided, it will be added to the attention
-    weight.
-    """
-    def generate_square_subsequent_mask(self, sz: int):
-        r"""
-        Generate a square mask for the sequence. The masked positions are
-        filled with float('-inf').
-        Unmasked positions are filled with float(0.0).
-        
-        Extracted from `torch.nn.Transformer.generate_square_subsequent_mask`.
-        """
-        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(
-            mask == 1, float(0.0))
-        return mask
-
-    mask = generate_square_subsequent_mask(data.size(0))
-    mask = (mask != float(0.0)).bool()
-    return mask
-
-
-def generate_padding_mask(data, vocab):
-    """
-    Padding mask provides specified elements in the key to be ignored
-    by the attention. If a ByteTensor is provided, the non-zero
-    positions will be ignored while the zero positions will be
-    unchanged. If a BoolTensor is provided, the positions with the
-    value of ``True`` will be ignored while the position with the
-    value of ``False`` will be unchanged.
-    """
-    pad_idx = vocab.stoi[PAD_WORD]
-    mask = (data == pad_idx).transpose(0, 1).bool()
-    return mask
