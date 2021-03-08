@@ -300,7 +300,20 @@ def generate_mask(data, model):
     If a FloatTensor is provided, it will be added to the attention
     weight.
     """
-    mask = model.generate_square_subsequent_mask(data.size(0))
+    def generate_square_subsequent_mask(self, sz: int):
+        r"""
+        Generate a square mask for the sequence. The masked positions are
+        filled with float('-inf').
+        Unmasked positions are filled with float(0.0).
+        
+        Extracted from `torch.nn.Transformer.generate_square_subsequent_mask`.
+        """
+        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(
+            mask == 1, float(0.0))
+        return mask
+
+    mask = generate_square_subsequent_mask(data.size(0))
     mask = (mask != float(0.0)).bool()
     return mask
 

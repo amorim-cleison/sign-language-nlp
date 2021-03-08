@@ -67,6 +67,3 @@ class CustomModel(nn.Module):
         x = embedding(x) * math.sqrt(self.d_model)
         x = pos_encoding(x)
         return x
-
-    def generate_square_subsequent_mask(self, sz: int) -> Tensor:
-        return self.transformer.generate_square_subsequent_mask(sz)
