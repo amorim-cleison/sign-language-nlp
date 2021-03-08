@@ -146,7 +146,7 @@ def run_training(model, epochs, criterion, optimizer, scheduler, train_data,
                 "ppl": f"{math.exp(val_loss):8.2f}"
             }
             log_step("valid", sep="-", **step_data)
-            # save_step("valid", checkpoint_dir, **step_data)
+            save_step("valid", checkpoint_dir, **step_data)
 
             # Save the model if the validation loss is the best we've seen so
             # far.
@@ -281,7 +281,7 @@ def train(epoch, model, data_source, criterion, optimizer, scheduler,
                 "ppl": f"{math.exp(cur_loss):8.2f}"
             }
             log_step("train", **step_data)
-            save_step("train", checkpoint_dir, **step_data)
+            # save_step("train", checkpoint_dir, **step_data)
             total_loss = 0
             start_time = time.time()
 

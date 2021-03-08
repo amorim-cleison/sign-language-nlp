@@ -4,6 +4,12 @@ class FieldComposer:
         self.strategy = strategy
 
     def compose_all_values(self, rows):
+        """
+        Example:
+        `
+        left_back           -                    -left_down_front     -                    -L                   -                    
+        `
+        """
         return list(
             map(
                 lambda row: "-".join([
@@ -12,6 +18,12 @@ class FieldComposer:
                 ]), rows))
 
     def compose_as_words(self, rows):
+        """
+        Example:
+        `
+        lb--ldf--L-
+        `
+        """
         def compose_field(data):
             return ''.join([k[0] for k in str(data['value']).split('_')
                             ]) if data else ''
@@ -21,7 +33,13 @@ class FieldComposer:
                 lambda row: "-".join(
                     [compose_field(row[f]) for f in self.fields]), rows))
 
-    def compose_as_words_norms(self, rows):
+    def compose_as_words_norm(self, rows):
+        """
+        Example:
+        `
+        l_b-___-ldf-___-L-
+        `
+        """
         def compose_field(field, data):
             values = str(data['value']) if data else ''
 
@@ -42,6 +60,12 @@ class FieldComposer:
                     [compose_field(f, row[f]) for f in self.fields]), rows))
 
     def compose_sep_feat(self, rows):
+        """
+        Example:
+        `
+        ['lb', '', 'ldf', '', 'L', '']
+        `
+        """
         def compose_field(data):
             return ''.join([k[0] for k in str(data['value']).split('_')
                             ]) if data else ''
@@ -57,6 +81,6 @@ class FieldComposer:
     FIELD_COMPOSE_STRATEGY = {
         "all_values": compose_all_values,
         "as_words": compose_as_words,
-        "as_words_norms": compose_as_words_norms,
+        "as_words_norm": compose_as_words_norm,
         "as_sep_feat": compose_sep_feat,
     }
