@@ -25,13 +25,12 @@ class CustomModel(nn.Module):
         self.softmax = nn.functional.log_softmax
 
     def to(self, device):
-        self.device = device
-        self.src_embedding = self.src_embedding.to(self.device)
-        self.src_pos_encoding = self.src_pos_encoding.to(self.device)
-        self.tgt_embedding = self.tgt_embedding.to(self.device)
-        self.tgt_pos_encoding = self.tgt_pos_encoding.to(self.device)
-        self.transformer = self.transformer.to(self.device)
-        self.linear = self.linear.to(self.device)
+        self.src_embedding = self.src_embedding.to(device)
+        self.src_pos_encoding = self.src_pos_encoding.to(device)
+        self.tgt_embedding = self.tgt_embedding.to(device)
+        self.tgt_pos_encoding = self.tgt_pos_encoding.to(device)
+        self.transformer = self.transformer.to(device)
+        self.linear = self.linear.to(device)
         return super().to(device)
 
     def forward(self,
