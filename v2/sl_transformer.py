@@ -298,11 +298,6 @@ def train(epoch, model, data_source, criterion, optimizer, scheduler,
 
 
 def calc_loss(criterion, output, targets):
-    # As the targets are shifted right (the first index is BOS token), we will
-    # consider since the second index:
-    output = output[1:]
-    targets = targets[1:]
-
     # total_loss += len(data) * criterion(output, targets).item()
     output = output.view(-1, output.size(-1))
     targets = targets.view(-1)
