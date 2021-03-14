@@ -125,15 +125,15 @@ def build_model(device, N, d_model, d_ff, h, dropout, src_vocab, tgt_vocab,
     def to_parallel(model, device):
         return nn.DataParallel(model) if (device.type == "cuda") else model
 
-    from .model import CustomModel
-    model = CustomModel(d_model=d_model,
-                        nhead=h,
-                        num_encoder_layers=N,
-                        num_decoder_layers=N,
-                        dim_feedforward=d_ff,
-                        dropout=dropout,
-                        src_ntoken=len(src_vocab),
-                        tgt_ntoken=len(tgt_vocab)).to(device)
+    from .model import TransformerModel
+    model = TransformerModel(d_model=d_model,
+                             nhead=h,
+                             num_encoder_layers=N,
+                             num_decoder_layers=N,
+                             dim_feedforward=d_ff,
+                             dropout=dropout,
+                             src_ntoken=len(src_vocab),
+                             tgt_ntoken=len(tgt_vocab)).to(device)
     return to_parallel(model, device)
 
 

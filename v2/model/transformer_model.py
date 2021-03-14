@@ -5,14 +5,14 @@ import torch.nn as nn
 from .positional_encoding import PositionalEncoding
 
 
-class CustomModel(nn.Module):
+class TransformerModel(nn.Module):
     from typing import Optional
 
     from torch import Tensor
 
     def __init__(self, d_model, nhead, num_encoder_layers, num_decoder_layers,
                  dim_feedforward, dropout, src_ntoken, tgt_ntoken, **kwargs):
-        super(CustomModel, self).__init__()
+        super(TransformerModel, self).__init__()
         self.d_model = d_model
         self.src_embedding = nn.Embedding(src_ntoken, d_model)
         self.src_pos_encoding = PositionalEncoding(d_model, dropout)
