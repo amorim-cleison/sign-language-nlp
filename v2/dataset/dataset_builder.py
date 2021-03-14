@@ -1,6 +1,6 @@
 from commons.log import log, log_progress
-from commons.util import exists, normpath
-from torchtext import data
+from commons.util import exists, normpath, filename
+from torchtext.data import Field, TabularDataset
 
 from .field_composer import FieldComposer
 from .custom_iterator import CustomIterator
@@ -42,27 +42,31 @@ def __provide_dataset(path, attributes_dir, samples_min_freq, max_len_sentence,
     # Create fields:
     composer = FieldComposer(fields, composition_strategy)
 
-    SRC = data.Field(pad_token=PAD_WORD, preprocessing=composer.run)
-    TGT = data.Field(
+    SRC = Field(pad_token=PAD_WORD,
+                unk_token=UNK_WORD,
+                preprocessing=composer.run)
+    TGT = Field(
         is_target=True,
         pad_first=True,
         init_token=BOS_WORD,
         #  eos_token=EOS_WORD,
-        unk_token=UNK_WORD,
         pad_token=PAD_WORD)
+    FILE = Field()
 
     # Create dataset:
-    dataset = data.TabularDataset(
+    dataset = TabularDataset(
         path=path,
         format="json",
         fields={
             'phonos': ('src', SRC),
-            'label': ('tgt', TGT)
+            'label': ('tgt', TGT),
+            'file': ('file', FILE)
         },
         filter_pred=lambda x: len(vars(x)['src']) <= max_len_sentence)
 
     SRC.build_vocab(dataset.src, min_freq=vocab_min_freq)
     TGT.build_vocab(dataset.tgt, min_freq=vocab_min_freq)
+    FILE.build_vocab(dataset.file)
 
     return dataset
 
@@ -79,19 +83,20 @@ def __make_dataset(attributes_dir, tgt_path, min_count):
     def prefix(file):
         return file.stem.split('-')[0]
 
+    def prepare_sample(path):
+        data = read_json(path)
+        data["file"] = filename(path)
+        return json.dumps(data).replace('null', '""')
+
     for file in files:
         if file not in processed:
             file_prefix = prefix(file)
             log_progress(len(processed), len(files), file_prefix)
+            similars = [x for x in files if prefix(x) == file_prefix]
+            processed.extend(similars)
 
-            similar = [x for x in files if prefix(x) == file_prefix]
-            processed.extend(similar)
-
-            if len(similar) >= min_count:
-                samples = [
-                    json.dumps(read_json(x)).replace('null', '""')
-                    for x in similar
-                ]
+            if len(similars) >= min_count:
+                samples = [prepare_sample(path) for path in similars]
                 save_items(samples, tgt_path, True)
 
 

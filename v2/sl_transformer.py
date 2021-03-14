@@ -1,13 +1,16 @@
 import math
 import time
+
 import torch
 import torch.nn as nn
 from commons.log import log
 from commons.util import normpath
+
 from .dataset import build_dataset, build_iterator
-from .util import log_step, save_step, generate_mask, generate_padding_mask
+from .util import (generate_mask, generate_padding_mask, log_step,
+                   save_eval_outputs, save_step)
 """
-This code was base on the link:
+This code was based on the link:
 - https://pytorch.org/tutorials/beginner/transformer_tutorial.html
 
 Other links:
@@ -34,7 +37,7 @@ def run(seed, cuda, config, dataset_args, model_args, training_args,
     train_data, val_data, test_data = load_data(device=device,
                                                 **dataset_args,
                                                 **training_args)
-    src_vocab, tgt_vocab = get_vocabs(train_data)
+    src_vocab, tgt_vocab, _ = get_vocabs(train_data)
 
     ###########################################################################
     # Build the model
@@ -71,7 +74,9 @@ def load_data(batch_size, device, **kwargs):
 
 
 def get_vocabs(dataset):
-    return dataset.fields["src"].vocab, dataset.fields["tgt"].vocab
+    return dataset.fields["src"].vocab,\
+           dataset.fields["tgt"].vocab,\
+           dataset.fields["file"].vocab
 
 
 def get_batches(data, device, batch_size, train, **kwargs):
@@ -133,9 +138,11 @@ def run_training(model, epochs, criterion, optimizer, scheduler, train_data,
                   checkpoint_dir=checkpoint_dir,
                   **kwargs)
 
-            val_loss, val_acc = evaluate(model=model,
+            val_loss, val_acc = evaluate(epoch=epoch,
+                                         model=model,
                                          criterion=criterion,
                                          data_source=val_data,
+                                         checkpoint_dir=checkpoint_dir,
                                          **kwargs)
 
             step_data = {
@@ -172,6 +179,7 @@ def run_test(criterion, test_data, checkpoint_dir, **kwargs):
     test_loss, test_acc = evaluate(model=model,
                                    criterion=criterion,
                                    data_source=test_data,
+                                   checkpoint_dir=checkpoint_dir,
                                    **kwargs)
     step_data = {
         "acc": f"{test_acc:5.2f}",
@@ -182,12 +190,18 @@ def run_test(criterion, test_data, checkpoint_dir, **kwargs):
     save_step("test", checkpoint_dir, **step_data)
 
 
-def evaluate(model, criterion, data_source, device, **kwargs):
+def evaluate(model,
+             criterion,
+             data_source,
+             device,
+             checkpoint_dir,
+             epoch=None,
+             **kwargs):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     total_loss = 0.
     total_acc = 0
-    src_vocab, tgt_vocab = get_vocabs(data_source)
+    src_vocab, tgt_vocab, file_vocab = get_vocabs(data_source)
     batches = get_batches(data=data_source,
                           train=False,
                           device=device,
@@ -196,7 +210,7 @@ def evaluate(model, criterion, data_source, device, **kwargs):
     with torch.no_grad():
         for i, batch in enumerate(batches):
             # Data:
-            src, tgt = batch.src, batch.tgt
+            src, tgt, files = batch.src, batch.tgt, batch.file
 
             # Masks:
             src_mask = None
@@ -211,17 +225,16 @@ def evaluate(model, criterion, data_source, device, **kwargs):
                                    tgt_mask=tgt_mask,
                                    src_key_padding_mask=src_padding_mask,
                                    tgt_key_padding_mask=tgt_padding_mask)
-            output = output.view(-1, output.size(-1))
-            tgt = tgt.view(-1)
 
             # Loss:
-            # TODO: review this. This was done once the loss was nn.NLLLoss()
-            # total_loss += len(data) * criterion(output, targets).item()
-            total_loss += criterion(output, tgt).item()
+            total_loss += calc_loss(criterion, output, tgt).item()
 
             # Accuracy:
-            # FIXME: analyze this. calculation considers BOS token
-            total_acc += calc_accuracy(output, tgt)
+            total_acc += calc_accuracy(output, tgt).item()
+
+            # Save outputs:
+            save_eval_outputs(output, tgt, files, tgt_vocab, file_vocab,
+                              checkpoint_dir, epoch)
 
     loss = total_loss / len(batches)
     accuracy = total_acc / len(batches)
@@ -234,7 +247,7 @@ def train(epoch, model, data_source, criterion, optimizer, scheduler,
     model.train()
     total_loss = 0.
     start_time = time.time()
-    src_vocab, tgt_vocab = get_vocabs(data_source)
+    src_vocab, tgt_vocab, _ = get_vocabs(data_source)
     batches = get_batches(data=data_source,
                           train=True,
                           device=device,
@@ -258,11 +271,9 @@ def train(epoch, model, data_source, criterion, optimizer, scheduler,
                                tgt_mask=tgt_mask,
                                src_key_padding_mask=src_padding_mask,
                                tgt_key_padding_mask=tgt_padding_mask)
-        output = output.view(-1, output.size(-1))
-        tgt = tgt.view(-1)
 
         # Loss and optimization:
-        loss = criterion(output, tgt)
+        loss = calc_loss(criterion, output, tgt)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
         optimizer.step()
@@ -286,5 +297,25 @@ def train(epoch, model, data_source, criterion, optimizer, scheduler,
             start_time = time.time()
 
 
+def calc_loss(criterion, output, targets):
+    # As the targets are shifted right (the first index is BOS token), we will
+    # consider since the second index:
+    output = output[1:]
+    targets = targets[1:]
+
+    # total_loss += len(data) * criterion(output, targets).item()
+    output = output.view(-1, output.size(-1))
+    targets = targets.view(-1)
+    return criterion(output, targets)
+
+
 def calc_accuracy(output, targets):
-    return (torch.argmax(output, dim=-1) == targets).sum() / len(targets)
+    # As the targets are shifted right (the first index is BOS token), we will
+    # consider since the second index:
+    output = output[1:]
+    targets = targets[1:]
+
+    output_labels = torch.argmax(output, dim=-1)
+    corrects = (output_labels == targets)
+    total = targets.nelement()
+    return corrects.sum() / total

@@ -34,6 +34,41 @@ def log_step(phase, sep: str = None, **data):
     separator()
 
 
+def save_eval_outputs(outputs,
+                      targets,
+                      files,
+                      tgt_vocab,
+                      file_vocab,
+                      dir,
+                      epoch=None):
+    import torch
+    from datetime import datetime
+    from commons.util import save_csv, create_if_missing, normpath
+
+    def greedy_decode(indexes, vocab):
+        d = [vocab.itos[i] for i in indexes]
+        return d[0] if len(d) == 1 else d
+
+    create_if_missing(dir)
+    path = normpath(f"{dir}/outputs_log.csv")
+    now = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+
+    outputs = torch.argmax(outputs, dim=-1).transpose(0, 1)
+    targets = targets.transpose(0, 1)
+    files = files.transpose(0, 1)
+
+    data = [{
+        "datetime": now,
+        "epoch": epoch if epoch else "",
+        "file": greedy_decode(f, file_vocab),
+        "output": greedy_decode(o, tgt_vocab),
+        "target": greedy_decode(t, tgt_vocab),
+        "correct": all(o == t)
+    } for (o, t, f) in zip(outputs, targets, files)]
+
+    save_csv(data, path, append=True)
+
+
 def generate_mask(data, model):
     """
     Mask ensures that position i is allowed to attend the unmasked
