@@ -7,8 +7,8 @@ from commons.log import log
 from commons.util import normpath
 
 from .dataset import build_dataset, build_iterator
-from .util import (generate_mask, generate_padding_mask, log_step,
-                   save_eval_outputs, save_step)
+from .util import (generate_mask, generate_padding_mask, log_step, log_model,
+                   log_data, save_eval_outputs, save_step)
 """
 This code was based on the link:
 - https://pytorch.org/tutorials/beginner/transformer_tutorial.html
@@ -24,6 +24,9 @@ def run(seed, cuda, config, dataset_args, model_args, training_args,
     # Set the random seed manually for reproducibility.
     torch.manual_seed(seed)
 
+    ###########################################################################
+    # Prepare CUDA
+    ###########################################################################
     if torch.cuda.is_available():
         if not cuda:
             log("WARNING: You have a CUDA device, so you should probably "
@@ -39,6 +42,14 @@ def run(seed, cuda, config, dataset_args, model_args, training_args,
                                                 **training_args)
     src_vocab, tgt_vocab, _ = get_vocabs(train_data)
 
+    log_data({
+        "train": train_data,
+        "val": val_data,
+        "test": test_data,
+        "src vocab": src_vocab,
+        "tgt vocab": tgt_vocab
+    })
+
     ###########################################################################
     # Build the model
     ###########################################################################
@@ -50,6 +61,13 @@ def run(seed, cuda, config, dataset_args, model_args, training_args,
     criterion = build_criterion(**training_args)
     optimizer = build_optimizer(model=model, **training_args)
     scheduler = build_scheduler(optimizer=optimizer, **training_args)
+
+    log_model({
+        "model": model,
+        "criterion": criterion,
+        "optimizer": optimizer,
+        "scheduler": scheduler
+    })
 
     ###########################################################################
     # Training code

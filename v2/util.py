@@ -5,7 +5,7 @@ from v2.dataset import PAD_WORD
 def save_step(phase, dir, **data):
     from commons.util import save_csv, create_if_missing, normpath
     create_if_missing(dir)
-    path = normpath(f"{dir}/epochs_log.csv")
+    path = normpath(f"{dir}/epoch_log.csv")
 
     from datetime import datetime
     new_data = {
@@ -50,7 +50,7 @@ def save_eval_outputs(outputs,
         return d[0] if len(d) == 1 else d
 
     create_if_missing(dir)
-    path = normpath(f"{dir}/outputs_log.csv")
+    path = normpath(f"{dir}/evaluation_log.csv")
     now = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
 
     outputs = torch.argmax(outputs, dim=-1).transpose(0, 1)
@@ -110,3 +110,25 @@ def generate_padding_mask(data, vocab):
     pad_idx = vocab.stoi[PAD_WORD]
     mask = (data == pad_idx).transpose(0, 1).bool()
     return mask
+
+
+def log_data(data):
+    log("-" * 100)
+    log("DATA")
+    log("-" * 100)
+
+    for name, value in data.items():
+        log(f"| {name.upper():15} | {len(value):10d} items |")
+    log("-" * 100)
+    log("")
+
+
+def log_model(model):
+    for name, value in model.items():
+        log("-" * 100)
+        log(f"{name.upper()}")
+        log("-" * 100)
+        log(value)
+        log("")
+    log("-" * 100)
+    log("")
