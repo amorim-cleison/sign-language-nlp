@@ -1,5 +1,5 @@
+seed: 1
 debug: False
-devices: [ ]
 log: Null
 
 transfer_learning:
@@ -13,16 +13,17 @@ dataset:
   fields: [
     orientation_dh,
     orientation_ndh, 
-    handshape_dh, 
-    handshape_ndh, 
     movement_dh_st, 
     movement_ndh_st,
+    handshape_dh, 
+    handshape_ndh, 
     # mouth_openness
   ]
   samples_min_freq: 2
   vocab_min_freq: 2
   max_len_sentence: 100
   train_split_ratio: 0.7
+  val_split_ratio: 0.1
   composition_strategy: as_words
 
 model:
@@ -33,14 +34,13 @@ model:
   dropout: 0.1
 
 training:
-  epochs: 100
+  epochs: 10 # Original: 100
   batch_size: 50
   warm_up: 400 # Original: 4000
-  lr: 0
-  betas: [0.9, 0.98]
-  eps: 0.000000001
-  label_smoothing: 0.1
-  log_steps_interval: 5
+  lr: 0.5
+  lr_step_gamma: 0.95
+  lr_step_size: 1.0
+  log_interval: 5
   checkpoint_dir: ../../work/sl-transformer/checkpoint
   checkpoint_interval: 1
   checkpoint_last_only: True

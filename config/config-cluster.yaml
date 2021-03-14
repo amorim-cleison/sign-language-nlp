@@ -1,5 +1,6 @@
+cuda: True
+seed: 1
 debug: False
-devices: [ 0 ]
 log: ../../work/sl-transformer/checkpoint/output.log
 
 transfer_learning:
@@ -22,7 +23,8 @@ dataset:
   samples_min_freq: 2
   vocab_min_freq: 2
   max_len_sentence: 100
-  train_split_ratio: 0.8
+  train_split_ratio: 0.7
+  val_split_ratio: 0.2
   composition_strategy: as_words
 
 model:
@@ -33,14 +35,16 @@ model:
   dropout: 0.1
 
 training:
-  epochs: 500
+  epochs: 100
   batch_size: 50
-  warm_up: 4000
-  lr: 0
-  betas: [0.9, 0.98]
-  eps: 0.000000001
-  label_smoothing: 0.1
-  log_steps_interval: 5
+  warm_up: 400
+  lr: 0.5
+  lr_step_gamma: 0.95
+  lr_step_size: 1.0
+  # betas: [0.9, 0.98]
+  # eps: 0.000000001
+  # label_smoothing: 0.1
+  log_interval: 5
   checkpoint_dir: ../../work/sl-transformer/checkpoint
   checkpoint_interval: 10
   checkpoint_last_only: True
