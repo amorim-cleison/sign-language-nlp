@@ -13,6 +13,7 @@ class TransformerModel(nn.Module):
     def __init__(self, d_model, nhead, num_encoder_layers, num_decoder_layers,
                  dim_feedforward, dropout, src_ntoken, tgt_ntoken, **kwargs):
         super(TransformerModel, self).__init__()
+        self.model_type = 'Transformer'
         self.d_model = d_model
         self.src_embedding = nn.Embedding(src_ntoken, d_model)
         self.src_pos_encoding = PositionalEncoding(d_model, dropout)

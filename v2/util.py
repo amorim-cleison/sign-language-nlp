@@ -53,9 +53,10 @@ def save_eval_outputs(outputs,
     path = normpath(f"{dir}/evaluation_log.csv")
     now = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
 
-    outputs = torch.argmax(outputs, dim=-1).transpose(0, 1)
-    targets = targets.transpose(0, 1)
-    files = files.transpose(0, 1)
+    outputs = torch.argmax(outputs, dim=-1)
+    outputs = outputs.transpose(0, 1) if len(outputs.size()) > 2 else outputs
+    targets = targets.transpose(0, 1) if len(targets.size()) > 1 else targets
+    files = files.transpose(0, 1) if len(files.size()) > 1 else files
 
     data = [{
         "datetime": now,

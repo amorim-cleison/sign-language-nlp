@@ -29,28 +29,32 @@ def build_dataset(path, train_split_ratio, val_split_ratio=None, **kwargs):
     return train, val, test
 
 
-def __provide_dataset(path, attributes_dir, samples_min_freq, max_len_sentence,
+def __provide_dataset(path, dataset_dir, samples_min_freq, max_len_sentence,
                       fields, composition_strategy, vocab_min_freq, **kwargs):
     # Create dataset if needed:
     path = normpath(path)
 
     if not exists(path):
         log(f"Creating dataset to '{path}'...")
-        __make_dataset(attributes_dir, path, samples_min_freq)
+        __make_dataset(dataset_dir, path, samples_min_freq)
         log("Finished")
 
     # Create fields:
     composer = FieldComposer(fields, composition_strategy)
 
+    FIX_LENGTH = None  # FIXME: verify this
+
     SRC = Field(pad_token=PAD_WORD,
                 unk_token=UNK_WORD,
-                preprocessing=composer.run)
+                preprocessing=composer.run,
+                fix_length=10)  # FIXME: verify this
     TGT = Field(
         is_target=True,
         pad_first=True,
         init_token=BOS_WORD,
         #  eos_token=EOS_WORD,
-        pad_token=PAD_WORD)
+        pad_token=PAD_WORD,
+        fix_length=FIX_LENGTH)  # FIXME: verify this
     FILE = Field()
 
     # Create dataset:
@@ -58,7 +62,7 @@ def __provide_dataset(path, attributes_dir, samples_min_freq, max_len_sentence,
         path=path,
         format="json",
         fields={
-            'phonos': ('src', SRC),
+            'frames.phonology': ('src', SRC),
             'label': ('tgt', TGT),
             'file': ('file', FILE)
         },
@@ -71,13 +75,13 @@ def __provide_dataset(path, attributes_dir, samples_min_freq, max_len_sentence,
     return dataset
 
 
-def __make_dataset(attributes_dir, tgt_path, min_count):
+def __make_dataset(dataset_dir, tgt_path, min_count):
     import json
 
     from commons.util import filter_files, read_json, save_items
 
-    assert exists(attributes_dir), "Invalid attributes directory"
-    files = filter_files(attributes_dir, ext="json", path_as_str=False)
+    assert exists(dataset_dir), "Invalid attributes directory"
+    files = filter_files(dataset_dir, ext="json", path_as_str=False)
     processed = list()
 
     def prefix(file):

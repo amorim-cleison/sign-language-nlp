@@ -9,7 +9,7 @@ transfer_learning:
   model_url: https://s3.amazonaws.com/opennmt-models/iwslt.pt
 
 dataset:
-  attributes_dir: ../../work/asllvd-skeleton/dataset/phono/3d
+  dataset_dir: ../../work/asllvd-skeleton/dataset/phono/3d
   path: ../../work/asllvd-skeleton/dataset/data.json
   fields: [
     orientation_dh,

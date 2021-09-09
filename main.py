@@ -1,9 +1,11 @@
 # from sl_transformer import run
-from v2.sl_transformer import run
+# from v2.sl_transformer import run
+# from v2.sl_rnn import run
+from v2 import ModelRunner, ModelBuilder
 from commons.util import Argument, load_args
-from commons.log import init_logger
 
 ARGUMENTS = [
+    Argument('-mt', '--model_type', help='Model type'),
     Argument('-d', '--debug', type=bool, help='Debug flag'),
     Argument('-s', '--seed', type=int, help='Random seed for reproducibility'),
     Argument('-nv', '--cuda', type=bool, default=False, help='Enable cuda'),
@@ -18,10 +20,11 @@ ARGUMENTS = [
 
 if __name__ == "__main__":
     args = load_args('SL Transformer', ARGUMENTS)
-    init_logger(args)
-
     args = {
         f"{k}_args" if isinstance(v, dict) else k: v
         for (k, v) in vars(args).items()
     }
-    run(**args)
+
+    objects_built = ModelBuilder(**args).build()
+
+    ModelRunner(**args, **objects_built).run()

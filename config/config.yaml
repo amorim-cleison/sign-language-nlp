@@ -1,20 +1,21 @@
 seed: 1
 debug: False
 log: Null
+model_type: Transformer
 
-transfer_learning:
-  enabled: False
-  model_path: ../../work/sl-transformer/transfer-model/iwslt.pt
-  model_url: https://s3.amazonaws.com/opennmt-models/iwslt.pt
+# transfer_learning:
+#   enabled: False
+#   model_path: ../../work/sl-transformer/transfer-model/iwslt.pt
+#   model_url: https://s3.amazonaws.com/opennmt-models/iwslt.pt
 
 dataset:
-  attributes_dir: ../../work/dataset/phono/3d
+  dataset_dir: ../../work/dataset/asl-phono/phonology/3d
   path: ../../work/dataset/data-debug.json
   fields: [
     orientation_dh,
     orientation_ndh, 
-    movement_dh_st, 
-    movement_ndh_st,
+    movement_dh, 
+    movement_ndh,
     handshape_dh, 
     handshape_ndh, 
     # mouth_openness

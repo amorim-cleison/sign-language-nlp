@@ -10,7 +10,8 @@
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "args": ["-c", "config/config-debug.yaml"]
         },
         {
             "name": "Run Main + Commons",
@@ -19,7 +20,8 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "preLaunchTask": "refresh-poetry"
+            "preLaunchTask": "refresh-poetry",
+            "args": ["-c", "config/config-debug.yaml"]
         }
     ]
 }

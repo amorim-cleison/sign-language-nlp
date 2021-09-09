@@ -75,8 +75,12 @@ class FieldComposer:
                 rows))
 
     def run(self, rows):
-        fn = self.FIELD_COMPOSE_STRATEGY[self.strategy]
-        return fn(self, rows)
+        try:
+            fn = self.FIELD_COMPOSE_STRATEGY[self.strategy]
+            return fn(self, rows)
+        except Exception as e:
+            raise Exception(f"There was an error while running strategy "
+                            f"'{self.strategy}' in FieldComposer: {repr(e)}")
 
     FIELD_COMPOSE_STRATEGY = {
         "all_values": compose_all_values,
