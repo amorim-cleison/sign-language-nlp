@@ -46,8 +46,9 @@ def save_eval_outputs(outputs,
     from commons.util import save_csv, create_if_missing, normpath
 
     def greedy_decode(indexes, vocab):
-        d = [vocab.itos[i] for i in indexes]
-        return d[0] if len(d) == 1 else d
+        return vocab.itos[indexes]
+        # d = [vocab.itos[i] for i in indexes]
+        # return d[0] if len(d) == 1 else d
 
     create_if_missing(dir)
     path = normpath(f"{dir}/evaluation_log.csv")
@@ -64,7 +65,7 @@ def save_eval_outputs(outputs,
         "file": greedy_decode(f, file_vocab),
         "output": greedy_decode(o, tgt_vocab),
         "target": greedy_decode(t, tgt_vocab),
-        "correct": all(o == t)
+        "correct": (o == t),
     } for (o, t, f) in zip(outputs, targets, files)]
 
     save_csv(data, path, append=True)

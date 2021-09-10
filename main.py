@@ -6,7 +6,7 @@ from commons.util import Argument, load_args
 
 ARGUMENTS = [
     Argument('-mt', '--model_type', help='Model type'),
-    Argument('-d', '--debug', type=bool, help='Debug flag'),
+    Argument('-d', '--debug', type=bool, default=False, help='Debug flag'),
     Argument('-s', '--seed', type=int, help='Random seed for reproducibility'),
     Argument('-nv', '--cuda', type=bool, default=False, help='Enable cuda'),
     Argument('-ds', '--dataset', type=dict, help='Options for the dataset'),
@@ -25,6 +25,6 @@ if __name__ == "__main__":
         for (k, v) in vars(args).items()
     }
 
-    objects_built = ModelBuilder(**args).build()
+    objects_built = ModelBuilder().build(**args)
 
-    ModelRunner(**args, **objects_built).run()
+    ModelRunner(**objects_built).run(**args)

@@ -56,11 +56,8 @@ class RNNModel(nn.Module):
             self.decoder.weight = self.encoder.weight
 
         self.init_weights()
-
-        self.rnn_type = rnn_type
         self.nhid = nhid
         self.nlayers = nlayers
-
         self.sigmoid = nn.Sigmoid()
 
     def to(self, device):
@@ -118,7 +115,7 @@ class RNNModel(nn.Module):
 
     def init_hidden(self, bsz):
         weight = next(self.parameters())
-        if self.rnn_type == 'LSTM':
+        if self.model_type == 'LSTM':
             return (weight.new_zeros(self.nlayers, bsz,
                                      self.nhid).to(self.device),
                     weight.new_zeros(self.nlayers, bsz,

@@ -7,8 +7,22 @@ from .custom_iterator import CustomIterator
 from .tokens import BOS_WORD, PAD_WORD, UNK_WORD, EOS_WORD
 
 
-def build_dataset(path, train_split_ratio, val_split_ratio=None, **kwargs):
-    dataset = __provide_dataset(path=path, **kwargs)
+def build_dataset(path,
+                  dataset_dir,
+                  fields,
+                  samples_min_freq,
+                  vocab_min_freq,
+                  max_len_sentence,
+                  composition_strategy,
+                  train_split_ratio,
+                  val_split_ratio=None):
+    dataset = __provide_dataset(path=path,
+                                dataset_dir=dataset_dir,
+                                samples_min_freq=samples_min_freq,
+                                max_len_sentence=max_len_sentence,
+                                fields=fields,
+                                composition_strategy=composition_strategy,
+                                vocab_min_freq=vocab_min_freq)
 
     if not val_split_ratio:
         val_split_ratio = 0
@@ -30,7 +44,7 @@ def build_dataset(path, train_split_ratio, val_split_ratio=None, **kwargs):
 
 
 def __provide_dataset(path, dataset_dir, samples_min_freq, max_len_sentence,
-                      fields, composition_strategy, vocab_min_freq, **kwargs):
+                      fields, composition_strategy, vocab_min_freq):
     # Create dataset if needed:
     path = normpath(path)
 
@@ -42,19 +56,19 @@ def __provide_dataset(path, dataset_dir, samples_min_freq, max_len_sentence,
     # Create fields:
     composer = FieldComposer(fields, composition_strategy)
 
-    FIX_LENGTH = None  # FIXME: verify this
+    FIX_LENGTH = 10  # FIXME: verify this -> check if it's possible to count dinamically
 
     SRC = Field(pad_token=PAD_WORD,
                 unk_token=UNK_WORD,
                 preprocessing=composer.run,
-                fix_length=10)  # FIXME: verify this
+                fix_length=FIX_LENGTH)
     TGT = Field(
         is_target=True,
         pad_first=True,
         init_token=BOS_WORD,
         #  eos_token=EOS_WORD,
         pad_token=PAD_WORD,
-        fix_length=FIX_LENGTH)  # FIXME: verify this
+        fix_length=None)
     FILE = Field()
 
     # Create dataset:

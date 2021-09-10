@@ -1,7 +1,5 @@
-seed: 1
 debug: False
 log: Null
-model_type: Transformer
 
 # transfer_learning:
 #   enabled: False
@@ -28,6 +26,7 @@ dataset:
   composition_strategy: as_words
 
 model:
+  model_type: LSTM # Transformer
   N: 6
   d_model: 512
   d_ff: 2048
@@ -35,6 +34,7 @@ model:
   dropout: 0.1
 
 training:
+  seed: 1
   epochs: 10 # Original: 100
   batch_size: 50
   warm_up: 400 # Original: 4000
