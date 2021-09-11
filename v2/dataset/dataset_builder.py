@@ -1,127 +1,230 @@
-from commons.log import log, log_progress
-from commons.util import exists, normpath, filename
+import json
+import tempfile
+
+from commons.log import auto_log_progress
+from commons.util import (delete_file, exists, filename, filter_files,
+                          read_json, save_items)
 from torchtext.data import Field, TabularDataset
 
-from .field_composer import FieldComposer
-from .custom_iterator import CustomIterator
-from .tokens import BOS_WORD, PAD_WORD, UNK_WORD, EOS_WORD
+from .tokens import BOS_WORD, EOS_WORD, PAD_WORD, UNK_WORD
 
 
-def build_dataset(path,
-                  dataset_dir,
-                  fields,
-                  samples_min_freq,
-                  vocab_min_freq,
-                  max_len_sentence,
-                  composition_strategy,
-                  train_split_ratio,
-                  val_split_ratio=None):
-    dataset = __provide_dataset(path=path,
-                                dataset_dir=dataset_dir,
-                                samples_min_freq=samples_min_freq,
-                                max_len_sentence=max_len_sentence,
-                                fields=fields,
-                                composition_strategy=composition_strategy,
-                                vocab_min_freq=vocab_min_freq)
+class DatasetBuilder():
+    def __init__(self):
+        pass
 
-    if not val_split_ratio:
-        val_split_ratio = 0
-    assert (train_split_ratio + val_split_ratio <=
-            1), "Invalid train/val split ratios."
-    test_split_ratio = 1 - train_split_ratio - val_split_ratio
+    def build(self, debug, dataset_args, **kwargs):
+        def do_build(debug,
+                     dataset_dir,
+                     fields,
+                     samples_min_freq,
+                     composition_strategy,
+                     train_split_ratio,
+                     val_split_ratio=None,
+                     **kwargs):
+            tmp = tempfile.NamedTemporaryFile(delete=False)
 
-    # ratios (parameter): [ train, test, val]
-    # output: (train, [val,] test)
-    splits = dataset.split(
-        split_ratio=[train_split_ratio, test_split_ratio, val_split_ratio])
+            try:
+                # Write transient working file:
+                self.write_working_file(path=tmp.name,
+                                        dataset_dir=dataset_dir,
+                                        min_freq=samples_min_freq,
+                                        debug=debug)
 
-    if len(splits) == 3:
-        train, val, test = splits
-    else:
-        train, test = splits
-        val = None
-    return train, val, test
+                # Dataset:
+                dataset, src_vocab, tgt_vocab, file_vocab = \
+                    self.create_dataset(
+                        path=tmp.name,
+                        fields=fields,
+                        composition_strategy=composition_strategy)
 
+                # Splits:
+                train_data, val_data, test_data = self.split_dataset(
+                    dataset=dataset,
+                    train_split_ratio=train_split_ratio,
+                    val_split_ratio=val_split_ratio)
 
-def __provide_dataset(path, dataset_dir, samples_min_freq, max_len_sentence,
-                      fields, composition_strategy, vocab_min_freq):
-    # Create dataset if needed:
-    path = normpath(path)
+                return {
+                    "dataset": dataset,
+                    "src_vocab": src_vocab,
+                    "tgt_vocab": tgt_vocab,
+                    "file_vocab": file_vocab,
+                    "train_data": train_data,
+                    "val_data": val_data,
+                    "test_data": test_data
+                }
+            except Exception as e:
+                raise Exception(f"Failed to load dataset: {repr(e)}")
+            finally:
+                tmp.close()
+                delete_file(tmp.name)
 
-    if not exists(path):
-        log(f"Creating dataset to '{path}'...")
-        __make_dataset(dataset_dir, path, samples_min_freq)
-        log("Finished")
+        return do_build(debug, **dataset_args)
 
-    # Create fields:
-    composer = FieldComposer(fields, composition_strategy)
+    def write_working_file(self, path, dataset_dir, min_freq, debug):
+        assert exists(dataset_dir), "Invalid attributes directory"
+        files = filter_files(dataset_dir, ext="json", path_as_str=False)
+        processed = list()
 
-    FIX_LENGTH = 10  # FIXME: verify this -> check if it's possible to count dinamically
+        def prefix(f):
+            return f.stem.split('-')[0]
 
-    SRC = Field(pad_token=PAD_WORD,
-                unk_token=UNK_WORD,
-                preprocessing=composer.run,
-                fix_length=FIX_LENGTH)
-    TGT = Field(
-        is_target=True,
-        pad_first=True,
-        init_token=BOS_WORD,
-        #  eos_token=EOS_WORD,
-        pad_token=PAD_WORD,
-        fix_length=None)
-    FILE = Field()
+        def prepare_sample(p):
+            data = read_json(p)
+            data["file"] = filename(p)
+            return json.dumps(data).replace('null', '""')
 
-    # Create dataset:
-    dataset = TabularDataset(
-        path=path,
-        format="json",
-        fields={
-            'frames.phonology': ('src', SRC),
-            'label': ('tgt', TGT),
-            'file': ('file', FILE)
-        },
-        filter_pred=lambda x: len(vars(x)['src']) <= max_len_sentence)
+        if debug:
+            files = files[:10]
 
-    SRC.build_vocab(dataset.src, min_freq=vocab_min_freq)
-    TGT.build_vocab(dataset.tgt, min_freq=vocab_min_freq)
-    FILE.build_vocab(dataset.file)
+        for f in auto_log_progress(files, message="Processing dataset... "):
+            if f not in processed:
+                f_prefix = prefix(f)
+                similars = [x for x in files if prefix(x) == f_prefix]
+                processed.extend(similars)
 
-    return dataset
+                if len(similars) >= min_freq:
+                    samples = [prepare_sample(p) for p in similars]
+                    save_items(samples, path, True)
 
+    def create_dataset(self, path, fields, composition_strategy):
+        def preprocess_src(rows):
+            return self.preprocess_src(rows, fields, composition_strategy)
 
-def __make_dataset(dataset_dir, tgt_path, min_count):
-    import json
+        # FIX_LENGTH = 10  # FIXME: verify this -> check if it's possible to count dinamically
 
-    from commons.util import filter_files, read_json, save_items
+        # Fields:
+        SRC = Field(pad_token=PAD_WORD,
+                    unk_token=UNK_WORD,
+                    preprocessing=preprocess_src,
+                    fix_length=None)
+        TGT = Field(
+            is_target=True,
+            pad_first=True,
+            init_token=BOS_WORD,
+            #  eos_token=EOS_WORD,
+            pad_token=PAD_WORD,
+            fix_length=None)
+        FILE = Field()
 
-    assert exists(dataset_dir), "Invalid attributes directory"
-    files = filter_files(dataset_dir, ext="json", path_as_str=False)
-    processed = list()
+        # Dataset:
+        dataset = TabularDataset(path=path,
+                                 format="json",
+                                 fields={
+                                     'frames.phonology': ('src', SRC),
+                                     'label': ('tgt', TGT),
+                                     'file': ('file', FILE)
+                                 })
 
-    def prefix(file):
-        return file.stem.split('-')[0]
+        # Vocabs:
+        SRC.build_vocab(dataset.src)
+        TGT.build_vocab(dataset.tgt)
+        FILE.build_vocab(dataset.file)
+        return dataset, SRC.vocab, TGT.vocab, FILE.vocab
 
-    def prepare_sample(path):
-        data = read_json(path)
-        data["file"] = filename(path)
-        return json.dumps(data).replace('null', '""')
+    def split_dataset(self, dataset, train_split_ratio, val_split_ratio=None):
+        if not val_split_ratio:
+            val_split_ratio = 0
+        assert (train_split_ratio + val_split_ratio <=
+                1), "Invalid train/val split ratios."
+        test_split_ratio = 1 - train_split_ratio - val_split_ratio
 
-    for file in files:
-        if file not in processed:
-            file_prefix = prefix(file)
-            log_progress(len(processed), len(files), file_prefix)
-            similars = [x for x in files if prefix(x) == file_prefix]
-            processed.extend(similars)
+        # ratios (parameter): [ train, test, val]
+        # output: (train, [val,] test)
+        splits = dataset.split(
+            split_ratio=[train_split_ratio, test_split_ratio, val_split_ratio])
 
-            if len(similars) >= min_count:
-                samples = [prepare_sample(path) for path in similars]
-                save_items(samples, tgt_path, True)
+        if len(splits) == 3:
+            train, val, test = splits
+        else:
+            train, test = splits
+            val = None
+        return train, val, test
 
+    def preprocess_src(self, rows, fields, composition_strategy):
+        STRATEGY_FN = {
+            "all_values": self.compose_all_values,
+            "as_words": self.compose_as_words,
+            "as_words_norm": self.compose_as_words_norm,
+            "as_sep_feat": self.compose_sep_feat,
+        }
+        assert (composition_strategy in STRATEGY_FN
+                ), f"Unknown composition strategy: '{composition_strategy}'"
 
-def build_iterator(dataset, batch_size, device, train):
-    return CustomIterator(dataset,
-                          batch_size=batch_size,
-                          device=device,
-                          repeat=False,
-                          sort_key=lambda x: (len(x.src), len(x.tgt)),
-                          train=train)
+        try:
+            fn = STRATEGY_FN[composition_strategy]
+            return fn(rows, fields)
+        except Exception as e:
+            raise Exception(
+                f"There was an error while running strategy "
+                f"'{composition_strategy}' in FieldComposer: {repr(e)}")
+
+    def compose_all_values(self, rows, fields):
+        """
+        Example:
+        `
+        left_back           -                    -left_down_front     -                    -L                   -                    
+        `
+        """
+        return list(
+            map(
+                lambda row: "-".join([
+                    f"{(row[x]['value'] if row[x] else ''):<20}"
+                    for x in fields
+                ]), rows))
+
+    def compose_as_words(self, rows, fields):
+        """
+        Example:
+        `
+        lb--ldf--L-
+        `
+        """
+        def compose_field(data):
+            return ''.join([k[0] for k in str(data['value']).split('_')
+                            ]) if data else ''
+
+        return list(
+            map(lambda row: "-".join([compose_field(row[f]) for f in fields]),
+                rows))
+
+    def compose_as_words_norm(self, rows, fields):
+        """
+        Example:
+        `
+        l_b-___-ldf-___-L-
+        `
+        """
+        def compose_field(field, data):
+            values = str(data['value']) if data else ''
+
+            if field.startswith("orientation") or field.startswith("movement"):
+                values = values.split('_')
+                return ''.join([("l" if "left" in values else
+                                 "r" if "right" in values else "_"),
+                                ("u" if "up" in values else
+                                 "d" if "down" in values else "_"),
+                                ("f" if "front" in values else
+                                 "b" if "back" in values else "_")])
+            else:
+                return values
+
+        return list(
+            map(
+                lambda row: "-".join(
+                    [compose_field(f, row[f]) for f in fields]), rows))
+
+    def compose_sep_feat(self, rows, fields):
+        """
+        Example:
+        `
+        ['lb', '', 'ldf', '', 'L', '']
+        `
+        """
+        def compose_field(data):
+            return ''.join([k[0] for k in str(data['value']).split('_')
+                            ]) if data else ''
+
+        return list(
+            map(lambda row: str([compose_field(row[f]) for f in fields]),
+                rows))

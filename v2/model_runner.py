@@ -5,7 +5,7 @@ import torch
 from commons.log import log
 from commons.util import normpath
 
-from .dataset import build_iterator, PAD_WORD
+from .dataset import CustomIterator, PAD_WORD
 from .util import (generate_mask, generate_padding_mask, log_step, log_model,
                    log_data, save_eval_outputs, save_step)
 
@@ -20,8 +20,8 @@ class ModelRunner():
     - http://nlp.seas.harvard.edu/2018/04/03/attention.html
     """
     def __init__(self, device, model, criterion, optimizer, scheduler,
-                 train_data, val_data, test_data, src_vocab, tgt_vocab, file_vocab,
-                 **kwargs):
+                 train_data, val_data, test_data, src_vocab, tgt_vocab,
+                 file_vocab, **kwargs):
         self.device = device
         self.model = model
         self.criterion = criterion
@@ -67,7 +67,12 @@ class ModelRunner():
         torch.manual_seed(seed)
 
     def get_batches(self, data, device, batch_size, train):
-        return build_iterator(data, batch_size, device, train)
+        return CustomIterator(data,
+                              batch_size=batch_size,
+                              device=device,
+                              repeat=False,
+                              sort_key=lambda x: (len(x.src), len(x.tgt)),
+                              train=train)
 
     def repackage_hidden(self, h):
         """
@@ -158,7 +163,6 @@ class ModelRunner():
         self.model.train()
         total_loss = 0.
         start_time = time.time()
-        # src_vocab, tgt_vocab, _ = self.get_vocabs(data_source)
         batches = self.get_batches(data=data_source,
                                    train=True,
                                    device=self.device,
@@ -215,7 +219,6 @@ class ModelRunner():
         model.eval()
         total_loss = 0.
         total_acc = 0
-        # src_vocab, tgt_vocab, file_vocab = self.get_vocabs(data_source)
         batches = self.get_batches(data=data_source,
                                    train=False,
                                    device=self.device,

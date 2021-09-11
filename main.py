@@ -1,7 +1,5 @@
-# from sl_transformer import run
-# from v2.sl_transformer import run
-# from v2.sl_rnn import run
 from v2 import ModelRunner, ModelBuilder
+from v2.dataset import DatasetBuilder
 from commons.util import Argument, load_args
 
 ARGUMENTS = [
@@ -25,6 +23,8 @@ if __name__ == "__main__":
         for (k, v) in vars(args).items()
     }
 
-    objects_built = ModelBuilder().build(**args)
+    dataset_objs = DatasetBuilder().build(**args)
 
-    ModelRunner(**objects_built).run(**args)
+    model_objs = ModelBuilder(**dataset_objs).build(**args)
+
+    ModelRunner(**dataset_objs, **model_objs).run(**args)

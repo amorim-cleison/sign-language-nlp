@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from commons.log import log
 
-from .dataset import build_dataset
+from .dataset import *
 
 
 class ModelBuilder():
@@ -14,27 +14,22 @@ class ModelBuilder():
     Other links:
     - http://nlp.seas.harvard.edu/2018/04/03/attention.html
     """
-    def __init__(self):
-        pass
+    def __init__(self, src_vocab, tgt_vocab, **kwargs):
+        self.src_vocab = src_vocab
+        self.tgt_vocab = tgt_vocab
 
-    def build(self, cuda, dataset_args, model_args, training_args, **kwargs):
+    def build(self, cuda, model_args, training_args, **kwargs):
         # ------------------------------------------------
         # Prepare device:
         # ------------------------------------------------
         device = self.prepare_device(cuda)
 
         # ------------------------------------------------
-        # Load data:
-        # ------------------------------------------------
-        train_data, val_data, test_data = build_dataset(**dataset_args)
-        src_vocab, tgt_vocab, file_vocab = self.get_vocabs(train_data)
-
-        # ------------------------------------------------
         # Build model:
         # ------------------------------------------------
         model = self.build_model(device=device,
-                                 src_vocab=src_vocab,
-                                 tgt_vocab=tgt_vocab,
+                                 src_vocab=self.src_vocab,
+                                 tgt_vocab=self.tgt_vocab,
                                  **model_args)
 
         criterion = self.build_criterion()
@@ -46,13 +41,7 @@ class ModelBuilder():
             "model": model,
             "criterion": criterion,
             "optimizer": optimizer,
-            "scheduler": scheduler,
-            "train_data": train_data,
-            "val_data": val_data,
-            "test_data": test_data,
-            "src_vocab": src_vocab,
-            "tgt_vocab": tgt_vocab,
-            "file_vocab": file_vocab
+            "scheduler": scheduler
         }
 
     def prepare_device(self, cuda):
@@ -62,11 +51,6 @@ class ModelBuilder():
                     "run with --cuda")
 
         return torch.device("cuda" if cuda else "cpu")
-
-    def get_vocabs(self, dataset):
-        return dataset.fields["src"].vocab,\
-            dataset.fields["tgt"].vocab,\
-            dataset.fields["file"].vocab
 
     def build_criterion(self, **kwargs):
         # return nn.NLLLoss()
