@@ -5,12 +5,11 @@ import torch
 from commons.log import log
 from commons.util import normpath
 
-from .dataset import CustomIterator, PAD_WORD
-from .util import (generate_mask, generate_padding_mask, log_step, log_model,
-                   log_data, save_eval_outputs, save_step)
+from dataset import CustomIterator
+from util import (log_data, log_model, log_step, save_eval_outputs, save_step)
 
 
-class ModelRunner():
+class Runner():
     """
     This code was based on the links:
     - https://pytorch.org/tutorials/beginner/transformer_tutorial.html
@@ -120,8 +119,10 @@ class ModelRunner():
                     with open(checkpoint_path, 'wb') as f:
                         torch.save(self.model, f)
                     best_val_loss = val_loss
+                else:
+                    self.scheduler.step()
 
-                self.scheduler.step()
+                # self.scheduler.step()
         except KeyboardInterrupt:
             log('-' * 100)
             log('Exiting from training early')
@@ -168,10 +169,10 @@ class ModelRunner():
                                    device=self.device,
                                    batch_size=batch_size)
 
-        hidden = None  # FIXME
-
         if self.model.model_type != 'Transformer':
             hidden = self.model.init_hidden(batch_size)
+        else:
+            hidden = None
 
         for i, batch in enumerate(batches):
             # Data:
@@ -228,10 +229,10 @@ class ModelRunner():
                                    device=self.device,
                                    batch_size=batch_size)
 
-        hidden = None  # FIXME
-
         if model.model_type != 'Transformer':
             hidden = model.init_hidden(batch_size)
+        else:
+            hidden = None
 
         with torch.no_grad():
             for i, batch in enumerate(batches):
@@ -275,9 +276,7 @@ class ModelRunner():
 
     def forward(self, batch, input, targets, hidden):
         if self.model.model_type == 'Transformer':
-            # src_mask = None
-            src_mask = generate_mask(input).to(
-                self.device)  # FIXME: check why not using
+            src_mask = generate_mask(input).to(self.device)
             tgt_mask = generate_mask(targets).to(self.device)
             src_padding_mask = \
                 generate_padding_mask(input, self.src_vocab).to(self.device)

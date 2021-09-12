@@ -2,8 +2,17 @@ import torch
 import torch.nn as nn
 from commons.log import log
 
+from model import GRU, LSTM, RNNRelu, RNNTanh, Transformer
+
 
 class ModelBuilder():
+    MODELS = {
+        "transformer": Transformer,
+        "gru": GRU,
+        "lstm": LSTM,
+        "rnn_relu": RNNRelu,
+        "rnn_tanh": RNNTanh
+    }
     """
     This code was based on the links:
     - https://pytorch.org/tutorials/beginner/transformer_tutorial.html
@@ -71,54 +80,21 @@ class ModelBuilder():
                         **kwargs):
         return torch.optim.lr_scheduler.StepLR(optimizer,
                                                step_size=lr_step_size,
-                                               gamma=lr_step_gamma)
+                                               gamma=lr_step_gamma,
+                                               verbose=True)
 
     def build_model(self, device, src_vocab, tgt_vocab, model_type, **kwargs):
         def to_parallel(model, device):
             return nn.DataParallel(model) if (device.type == "cuda") else model
 
-        MODEL_BUILDER = {
-            "Transformer": self.create_transformer,
-            "LSTM": self.create_rnn,
-            "GRU": self.create_rnn,
-            "RNN_TANH": self.create_rnn,
-            "RNN_RELU": self.create_rnn
+        assert (model_type.lower() in self.MODELS), \
+            f"Unsupported model type: '{model_type}'"
+
+        extra_args = {
+            "src_vocab": src_vocab,
+            "tgt_vocab": tgt_vocab,
+            "device": device
         }
-
-        if model_type in MODEL_BUILDER:
-            builder = MODEL_BUILDER[model_type]
-            model = builder(model_type=model_type,
-                            src_vocab=src_vocab,
-                            tgt_vocab=tgt_vocab,
-                            **kwargs).to(device)
-        else:
-            raise Exception(f"Unsupported model type: '{model_type}'")
-
+        _cls = self.MODELS[model_type.lower()]
+        model = _cls(**extra_args, **kwargs).to(device)
         return to_parallel(model, device)
-
-    def create_transformer(self, N, d_model, d_ff, h, dropout, src_vocab,
-                           tgt_vocab, **kwargs):
-        from .model import TransformerModel
-        return TransformerModel(d_model=d_model,
-                                nhead=h,
-                                num_encoder_layers=N,
-                                num_decoder_layers=N,
-                                dim_feedforward=d_ff,
-                                dropout=dropout,
-                                src_ntoken=len(src_vocab),
-                                tgt_ntoken=len(tgt_vocab))
-
-    def create_rnn(self, model_type, N, d_model, d_ff, dropout, src_vocab,
-                   tgt_vocab, **kwargs):
-        from .model import RNNModel
-        args = {
-            "rnn_type": model_type,
-            "src_ntoken": len(src_vocab),
-            "tgt_ntoken": len(tgt_vocab),
-            "ninp": d_model,
-            "nhid": d_ff,
-            "nlayers": N,
-            "dropout": dropout,
-            "tie_weights": False
-        }  # FIXME: adjust this mapping
-        return RNNModel(**args)
