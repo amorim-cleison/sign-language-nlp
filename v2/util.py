@@ -71,7 +71,7 @@ def save_eval_outputs(outputs,
     save_csv(data, path, append=True)
 
 
-def generate_mask(data, model):
+def generate_mask(data):
     """
     Mask ensures that position i is allowed to attend the unmasked
     positions. If a ByteTensor is provided, the non-zero positions are

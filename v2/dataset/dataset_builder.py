@@ -1,91 +1,105 @@
 import json
 import tempfile
 
-from commons.log import auto_log_progress
+from commons.log import auto_log_progress, log
 from commons.util import (delete_file, exists, filename, filter_files,
                           read_json, save_items)
 from torchtext.data import Field, TabularDataset
 
 from .tokens import BOS_WORD, EOS_WORD, PAD_WORD, UNK_WORD
 
+import pandas as pd
+import numpy as np
+
 
 class DatasetBuilder():
+
+    BATCH_SIZE = 10
+
     def __init__(self):
         pass
 
     def build(self, debug, dataset_args, **kwargs):
-        def do_build(debug,
-                     dataset_dir,
-                     fields,
-                     samples_min_freq,
-                     composition_strategy,
-                     train_split_ratio,
-                     val_split_ratio=None,
-                     **kwargs):
-            tmp = tempfile.NamedTemporaryFile(delete=False)
+        try:
+            return self.do_build(debug, **dataset_args)
+        except Exception as e:
+            raise Exception(f"Failed to build dataset: {repr(e)}")
 
-            try:
-                # Write transient working file:
-                self.write_working_file(path=tmp.name,
-                                        dataset_dir=dataset_dir,
-                                        min_freq=samples_min_freq,
-                                        debug=debug)
+    def do_build(self,
+                 debug,
+                 dataset_dir,
+                 fields,
+                 samples_min_freq,
+                 composition_strategy,
+                 train_split_ratio,
+                 val_split_ratio=None,
+                 **kwargs):
+        tmp = tempfile.NamedTemporaryFile(delete=False)
 
-                # Dataset:
-                dataset, src_vocab, tgt_vocab, file_vocab = \
-                    self.create_dataset(
-                        path=tmp.name,
-                        fields=fields,
-                        composition_strategy=composition_strategy)
+        try:
+            # Write transient working file:
+            self.write_working_file(path=tmp.name,
+                                    dataset_dir=dataset_dir,
+                                    min_freq=samples_min_freq,
+                                    debug=debug)
 
-                # Splits:
-                train_data, val_data, test_data = self.split_dataset(
-                    dataset=dataset,
-                    train_split_ratio=train_split_ratio,
-                    val_split_ratio=val_split_ratio)
+            # Dataset:
+            dataset, src_vocab, tgt_vocab, file_vocab = \
+                self.create_dataset(
+                    path=tmp.name,
+                    fields=fields,
+                    composition_strategy=composition_strategy)
 
-                return {
-                    "dataset": dataset,
-                    "src_vocab": src_vocab,
-                    "tgt_vocab": tgt_vocab,
-                    "file_vocab": file_vocab,
-                    "train_data": train_data,
-                    "val_data": val_data,
-                    "test_data": test_data
-                }
-            except Exception as e:
-                raise Exception(f"Failed to load dataset: {repr(e)}")
-            finally:
-                tmp.close()
-                delete_file(tmp.name)
+            # Splits:
+            train_data, val_data, test_data = self.split_dataset(
+                dataset=dataset,
+                train_split_ratio=train_split_ratio,
+                val_split_ratio=val_split_ratio)
 
-        return do_build(debug, **dataset_args)
+            return {
+                "dataset": dataset,
+                "src_vocab": src_vocab,
+                "tgt_vocab": tgt_vocab,
+                "file_vocab": file_vocab,
+                "train_data": train_data,
+                "val_data": val_data,
+                "test_data": test_data
+            }
+        finally:
+            tmp.close()
+            delete_file(tmp.name)
 
     def write_working_file(self, path, dataset_dir, min_freq, debug):
-        assert exists(dataset_dir), "Invalid attributes directory"
-        files = filter_files(dataset_dir, ext="json", path_as_str=False)
-        processed = list()
-
         def prefix(f):
             return f.stem.split('-')[0]
 
-        def prepare_sample(p):
+        def prepare_row(p):
             data = read_json(p)
             data["file"] = filename(p)
             return json.dumps(data).replace('null', '""')
 
+        assert exists(dataset_dir), "Invalid dataset directory"
+        files = filter_files(dataset_dir, ext="json", path_as_str=False)
+
         if debug:
-            files = files[:10]
+            files = files[:100]
 
-        for f in auto_log_progress(files, message="Processing dataset... "):
-            if f not in processed:
-                f_prefix = prefix(f)
-                similars = [x for x in files if prefix(x) == f_prefix]
-                processed.extend(similars)
+        # Group and filter data:
+        df = pd.DataFrame({"file": files})
+        df["prefix"] = df["file"].apply(prefix)
+        df = df\
+            .groupby(["prefix"])\
+            .filter(lambda x: x["file"].count() >= min_freq)
 
-                if len(similars) >= min_freq:
-                    samples = [prepare_sample(p) for p in similars]
-                    save_items(samples, path, True)
+        # Separate data chunks:
+        n_samples = len(df)
+        n_batches = n_samples / self.BATCH_SIZE
+        batches = np.array_split(df, n_batches)
+        msg = "Processing dataset... "
+
+        for batch in auto_log_progress(batches, message=msg):
+            rows = batch["file"].apply(prepare_row)
+            save_items(rows, path, True)
 
     def create_dataset(self, path, fields, composition_strategy):
         def preprocess_src(rows):

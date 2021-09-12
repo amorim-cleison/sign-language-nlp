@@ -1,14 +1,8 @@
-debug: True
+debug: False
 log: Null
-
-# transfer_learning:
-#   enabled: False
-#   model_path: ../../work/sl-transformer/transfer-model/iwslt.pt
-#   model_url: https://s3.amazonaws.com/opennmt-models/iwslt.pt
 
 dataset:
   dataset_dir: ../../work/dataset/asl-phono/phonology/3d
-  # work_data_path: ../../work/dataset/data-debug.json    # Path where will be created a flat transitory file with the content of the dataset
   fields: [
     orientation_dh,
     orientation_ndh, 

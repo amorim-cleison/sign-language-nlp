@@ -35,33 +35,30 @@ class ModelRunner():
         self.file_vocab = file_vocab
 
     def run(self, debug, training_args, **kwargs):
-        def do_run(seed, debug, epochs, log_interval, checkpoint_dir,
-                   batch_size, **kwargs):
-            self.log_objects()
+        try:
+            self.do_run(debug=debug, **training_args)
+        except Exception as e:
+            raise Exception(f"Failed to run model: {repr(e)}")
 
-            # ------------------------------------------------
-            # Set random seed manually (for reproducibility):
-            # ------------------------------------------------
-            self.setup_seed(seed)
+    def do_run(self, seed, debug, epochs, log_interval, checkpoint_dir,
+               batch_size, **kwargs):
+        self.log_objects()
 
-            # ------------------------------------------------
-            # Train model:
-            # ------------------------------------------------
-            self.run_training(debug, epochs, log_interval, checkpoint_dir,
-                              batch_size)
+        # ------------------------------------------------
+        # Set random seed manually (for reproducibility):
+        # ------------------------------------------------
+        self.setup_seed(seed)
 
-            # ------------------------------------------------
-            # Test model:
-            # ------------------------------------------------
-            self.run_test(debug, checkpoint_dir, batch_size)
+        # ------------------------------------------------
+        # Train model:
+        # ------------------------------------------------
+        self.run_training(debug, epochs, log_interval, checkpoint_dir,
+                          batch_size)
 
-        do_run(debug=debug, **training_args)
-
-    # FIXME: check if its possible remove multiple calls to get_vocab
-    def get_vocabs(self, dataset):
-        return dataset.fields["src"].vocab,\
-            dataset.fields["tgt"].vocab,\
-            dataset.fields["file"].vocab
+        # ------------------------------------------------
+        # Test model:
+        # ------------------------------------------------
+        self.run_test(debug, checkpoint_dir, batch_size)
 
     def setup_seed(self, seed):
         torch.manual_seed(seed)
@@ -99,7 +96,7 @@ class ModelRunner():
                            checkpoint_dir=checkpoint_dir,
                            batch_size=batch_size)
 
-                val_loss, val_acc = self.evaluate(
+                val_loss, val_acc, val_ppl = self.evaluate(
                     debug=debug,
                     epoch=epoch,
                     model=self.model,
@@ -112,7 +109,7 @@ class ModelRunner():
                     "time": f"{(time.time() - epoch_start_time):5.2f}s",
                     "acc": f"{val_acc:5.2f}",
                     "loss": f"{val_loss:5.2f}",
-                    "ppl": f"{math.exp(val_loss):8.2f}"
+                    "ppl": f"{val_ppl:8.2f}"
                 }
                 log_step("valid", sep="-", **step_data)
                 save_step("valid", checkpoint_dir, **step_data)
@@ -134,25 +131,28 @@ class ModelRunner():
 
         # Load the best saved model.
         with open(save, 'rb') as f:
-            model = torch.load(f)
+            best_model = torch.load(f)
 
             # after load the rnn params are not a continuous chunk of memory
             # this makes them a continuous chunk, and will speed up forward
             # pass. Currently, only rnn model supports flatten_parameters
             # function.
-            if model.model_type in ['RNN_TANH', 'RNN_RELU', 'LSTM', 'GRU']:
-                model.rnn.flatten_parameters()
+            if best_model.model_type in [
+                    'RNN_TANH', 'RNN_RELU', 'LSTM', 'GRU'
+            ]:
+                best_model.rnn.flatten_parameters()
 
         # Run on test data.
-        test_loss, test_acc = self.evaluate(debug=debug,
-                                            model=model,
-                                            data_source=self.test_data,
-                                            checkpoint_dir=checkpoint_dir,
-                                            batch_size=batch_size)
+        test_loss, test_acc, test_ppl = self.evaluate(
+            debug=debug,
+            model=best_model,
+            data_source=self.test_data,
+            checkpoint_dir=checkpoint_dir,
+            batch_size=batch_size)
         step_data = {
             "acc": f"{test_acc:5.2f}",
             "loss": f"{test_loss:5.2f}",
-            "ppl": f"{math.exp(test_loss):8.2f}"
+            "ppl": f"{test_ppl:8.2f}"
         }
         log_step("test", sep="=", **step_data)
         save_step("test", checkpoint_dir, **step_data)
@@ -168,6 +168,8 @@ class ModelRunner():
                                    device=self.device,
                                    batch_size=batch_size)
 
+        hidden = None  # FIXME
+
         if self.model.model_type != 'Transformer':
             hidden = self.model.init_hidden(batch_size)
 
@@ -177,11 +179,13 @@ class ModelRunner():
 
             # Forward:
             self.optimizer.zero_grad()
-
-            output = self.forward(batch, src, tgt)
+            output = self.forward(batch=batch,
+                                  input=src,
+                                  targets=tgt,
+                                  hidden=hidden)
 
             # Loss and optimization:
-            loss = self.compute_loss(output, tgt)
+            loss = self.compute_loss(output=output, targets=tgt)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
             self.optimizer.step()
@@ -218,11 +222,13 @@ class ModelRunner():
         # Turn on evaluation mode which disables dropout.
         model.eval()
         total_loss = 0.
-        total_acc = 0
+        total_acc = 0.
         batches = self.get_batches(data=data_source,
                                    train=False,
                                    device=self.device,
                                    batch_size=batch_size)
+
+        hidden = None  # FIXME
 
         if model.model_type != 'Transformer':
             hidden = model.init_hidden(batch_size)
@@ -233,13 +239,18 @@ class ModelRunner():
                 src, tgt, files = batch.src, batch.tgt, batch.file
 
                 # Forward:
-                output = self.forward(batch, src, tgt)
+                output = self.forward(batch=batch,
+                                      input=src,
+                                      targets=tgt,
+                                      hidden=hidden)
 
                 # Loss:
-                total_loss += self.compute_loss(output, tgt).item()
+                total_loss += self.compute_loss(output=output,
+                                                targets=tgt).item()
 
                 # Accuracy:
-                total_acc += self.compute_accuracy(output, tgt).item()
+                total_acc += self.compute_accuracy(output=output,
+                                                   targets=tgt).item()
 
                 # Save outputs:
                 output = output[-1]
@@ -259,27 +270,29 @@ class ModelRunner():
 
         loss = total_loss / len(batches)
         accuracy = total_acc / len(batches)
-        return loss, accuracy
+        ppl = math.exp(loss)
+        return loss, accuracy, ppl
 
-    def forward(self, batch, src, tgt):
+    def forward(self, batch, input, targets, hidden):
         if self.model.model_type == 'Transformer':
-            src_mask = None
-            tgt_mask = generate_mask(tgt, self.model).to(self.device)
+            # src_mask = None
+            src_mask = generate_mask(input).to(
+                self.device)  # FIXME: check why not using
+            tgt_mask = generate_mask(targets).to(self.device)
             src_padding_mask = \
-                generate_padding_mask(src, self.src_vocab).to(self.device)
+                generate_padding_mask(input, self.src_vocab).to(self.device)
             tgt_padding_mask = \
-                generate_padding_mask(tgt, self.tgt_vocab).to(self.device)
+                generate_padding_mask(targets, self.tgt_vocab).to(self.device)
 
-            output = self.model.forward(src=src,
-                                        tgt=tgt,
+            output = self.model.forward(src=input,
+                                        tgt=targets,
                                         src_mask=src_mask,
                                         tgt_mask=tgt_mask,
                                         src_key_padding_mask=src_padding_mask,
                                         tgt_key_padding_mask=tgt_padding_mask)
         else:
-            hidden = self.model.init_hidden(len(batch))  # FIXME
-            output, hidden = self.model.forward(input=src, hidden=hidden)
-            # hidden = repackage_hidden(hidden)
+            output, hidden = self.model.forward(input=input, hidden=hidden)
+            hidden = self.repackage_hidden(hidden)
         return output
 
     def compute_loss(self, output, targets):

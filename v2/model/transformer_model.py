@@ -43,6 +43,9 @@ class TransformerModel(nn.Module):
                 src_key_padding_mask: Optional[Tensor] = None,
                 tgt_key_padding_mask: Optional[Tensor] = None,
                 memory_key_padding_mask: Optional[Tensor] = None):
+        assert (src is not None), "`src` is a required paramenter"
+        assert (tgt is not None), "`tgt` is a required paramenter"
+
         # Embeddings:
         src_embed = self.forward_embedding(src, self.src_embedding,
                                            self.src_pos_encoding)

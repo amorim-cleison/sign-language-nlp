@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 from commons.log import log
 
-from .dataset import *
-
 
 class ModelBuilder():
     """
@@ -18,7 +16,13 @@ class ModelBuilder():
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
 
-    def build(self, cuda, model_args, training_args, **kwargs):
+    def build(self, **kwargs):
+        try:
+            return self.do_build(**kwargs)
+        except Exception as e:
+            raise Exception(f"Failed to build dataset: {repr(e)}")
+
+    def do_build(self, cuda, model_args, training_args, **kwargs):
         # ------------------------------------------------
         # Prepare device:
         # ------------------------------------------------
