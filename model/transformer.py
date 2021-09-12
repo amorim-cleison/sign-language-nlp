@@ -1,10 +1,9 @@
 import math
 
 import torch.nn as nn
-from torch import Tensor
 
-from model.component import PositionalEncoding
-from model.util import generate_mask, generate_padding_mask
+from .component import PositionalEncoding
+from .util import generate_mask, generate_padding_mask
 
 
 class Transformer(nn.Module):
@@ -55,9 +54,12 @@ class Transformer(nn.Module):
         self.device = device
         return super().to(device)
 
-    def forward(self, src: Tensor, tgt: Tensor):
-        assert (src is not None), "`src` is a required paramenter"
-        assert (tgt is not None), "`tgt` is a required paramenter"
+    def forward(self, input, targets, **kwargs):
+        assert (input is not None), "`input` is a required paramenter"
+        assert (targets is not None), "`targets` is a required paramenter"
+
+        src = input
+        tgt = targets
 
         # Masks:
         src_mask = generate_mask(src).to(self.device)

@@ -34,10 +34,10 @@ class Runner():
         self.file_vocab = file_vocab
 
     def run(self, debug, training_args, **kwargs):
-        try:
-            self.do_run(debug=debug, **training_args)
-        except Exception as e:
-            raise Exception(f"Failed to run model: {repr(e)}")
+        # try:
+        self.do_run(debug=debug, **training_args)
+        # except Exception as e:
+        #     raise Exception(f"Failed to run model: {repr(e)}")
 
     def do_run(self, seed, debug, epochs, log_interval, checkpoint_dir,
                batch_size, **kwargs):
@@ -169,21 +169,20 @@ class Runner():
                                    device=self.device,
                                    batch_size=batch_size)
 
-        if self.model.model_type != 'Transformer':
-            hidden = self.model.init_hidden(batch_size)
-        else:
-            hidden = None
+        # Hidden layers:
+        hidden = self.init_hidden(self.model, batch_size)
 
         for i, batch in enumerate(batches):
             # Data:
             src, tgt = batch.src, batch.tgt
 
-            # Forward:
             self.optimizer.zero_grad()
-            output = self.forward(batch=batch,
-                                  input=src,
-                                  targets=tgt,
-                                  hidden=hidden)
+
+            # Forward:
+            output, hidden = self.forward(model=self.model,
+                                          input=src,
+                                          targets=tgt,
+                                          hidden=hidden)
 
             # Loss and optimization:
             loss = self.compute_loss(output=output, targets=tgt)
@@ -229,10 +228,8 @@ class Runner():
                                    device=self.device,
                                    batch_size=batch_size)
 
-        if model.model_type != 'Transformer':
-            hidden = model.init_hidden(batch_size)
-        else:
-            hidden = None
+        # Hidden layers:
+        hidden = self.init_hidden(model, batch_size)
 
         with torch.no_grad():
             for i, batch in enumerate(batches):
@@ -240,7 +237,7 @@ class Runner():
                 src, tgt, files = batch.src, batch.tgt, batch.file
 
                 # Forward:
-                output = self.forward(batch=batch,
+                output = self.forward(model=model,
                                       input=src,
                                       targets=tgt,
                                       hidden=hidden)
@@ -274,25 +271,20 @@ class Runner():
         ppl = math.exp(loss)
         return loss, accuracy, ppl
 
-    def forward(self, batch, input, targets, hidden):
-        if self.model.model_type == 'Transformer':
-            src_mask = generate_mask(input).to(self.device)
-            tgt_mask = generate_mask(targets).to(self.device)
-            src_padding_mask = \
-                generate_padding_mask(input, self.src_vocab).to(self.device)
-            tgt_padding_mask = \
-                generate_padding_mask(targets, self.tgt_vocab).to(self.device)
-
-            output = self.model.forward(src=input,
-                                        tgt=targets,
-                                        src_mask=src_mask,
-                                        tgt_mask=tgt_mask,
-                                        src_key_padding_mask=src_padding_mask,
-                                        tgt_key_padding_mask=tgt_padding_mask)
+    def init_hidden(self, model, batch_size):
+        if self.is_rnn(model):
+            hidden = model.init_hidden(batch_size)
         else:
-            output, hidden = self.model.forward(input=input, hidden=hidden)
+            hidden = None
+        return hidden
+
+    def forward(self, model, input, targets, hidden):
+        if self.is_rnn(model):
             hidden = self.repackage_hidden(hidden)
-        return output
+            output, hidden = model.forward(input=input, hidden=hidden)
+        else:
+            output = model.forward(input=input, targets=targets)
+        return output, hidden
 
     def compute_loss(self, output, targets):
         # total_loss += len(data) * criterion(output, targets).item()
@@ -330,3 +322,7 @@ class Runner():
             "optimizer": self.optimizer,
             "scheduler": self.scheduler
         })
+
+    def is_rnn(self, model):
+        from model.base import RNNModel
+        return isinstance(model, RNNModel)

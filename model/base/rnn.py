@@ -1,5 +1,4 @@
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class RNNModel(nn.Module):
@@ -44,7 +43,8 @@ class RNNModel(nn.Module):
             self.decoder.weight = self.encoder.weight
 
         self.init_weights()
-        self.sigmoid = nn.Sigmoid()
+        # self.sigmoid = nn.Sigmoid()
+        self.softmax = nn.functional.log_softmax
 
     def to(self, device):
         self.device = device
@@ -56,13 +56,15 @@ class RNNModel(nn.Module):
         nn.init.zeros_(self.decoder.weight)
         nn.init.uniform_(self.decoder.weight, -initrange, initrange)
 
-    def forward(self, input, hidden):
+    def forward(self, input, hidden, **kwargs):
         emb = self.drop(self.encoder(input))
-        output, hidden = self.rnn(emb, hidden)
+        output, hidden = self.rnn(emb, hidden)   # FIXME: error on last batch: Expected hidden[0] size (6, 15, 2048), got [6, 50, 2048]
         output = self.drop(output)
-        decoded = self.decoder(output)
-        return F.log_softmax(decoded, dim=1), hidden
+        output = self.decoder(output)
+        # return F.log_softmax(decoded, dim=1), hidden
+        output = self.softmax(output, dim=-1)   # FIXME: confirm if softmax is correct here
+        return output, hidden
 
-    def init_hidden(self, bsz):
+    def init_hidden(self, batch_size):
         weight = next(self.parameters())
-        return weight.new_zeros(self.num_layers, bsz, self.hidden_size)
+        return weight.new_zeros(self.num_layers, batch_size, self.hidden_size)

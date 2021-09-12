@@ -14,9 +14,9 @@ class LSTM(RNNModel):
                        num_layers=num_layers,
                        dropout=dropout)
 
-    def init_hidden(self, bsz):
+    def init_hidden(self, batch_size):
         weight = next(self.parameters())
-        return (weight.new_zeros(self.num_layers, bsz,
+        return (weight.new_zeros(self.num_layers, batch_size,
                                  self.hidden_size).to(self.device),
-                weight.new_zeros(self.num_layers, bsz,
+                weight.new_zeros(self.num_layers, batch_size,
                                  self.hidden_size).to(self.device))
