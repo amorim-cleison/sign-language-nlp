@@ -3,8 +3,8 @@ import math
 import torch.nn as nn
 from torch import Tensor
 
-from .component import PositionalEncoding
-from .util import generate_mask, generate_padding_mask
+from model.component import PositionalEncoding
+from model.util import generate_mask, generate_padding_mask
 
 
 class Transformer(nn.Module):
