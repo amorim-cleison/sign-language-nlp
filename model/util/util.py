@@ -2,6 +2,10 @@ import torch
 from dataset.constant import PAD_WORD
 
 
+def get_pad_idx(vocab):
+    return vocab.stoi[PAD_WORD]
+
+
 def generate_mask(data):
     """
     Mask ensures that position i is allowed to attend the unmasked
@@ -39,6 +43,25 @@ def generate_padding_mask(data, vocab):
     value of ``True`` will be ignored while the position with the
     value of ``False`` will be unchanged.
     """
-    pad_idx = vocab.stoi[PAD_WORD]
+    pad_idx = get_pad_idx(vocab)
     mask = (data == pad_idx).transpose(0, 1).bool()
     return mask
+
+
+def generate_seq_lengths(data, vocab):
+    pad_idx = get_pad_idx(vocab)
+    return (data != pad_idx).transpose(0, 1).sum(dim=-1)
+
+
+def pad_to_shape(data, shape, vocab, pad_first=False):
+    import torch.nn.functional as F
+    pad_len = shape[0] - data.shape[0]
+
+    if pad_len > 0:
+        pad_idx = get_pad_idx(vocab)
+        pad_first_len = pad_len if pad_first else 0
+        pad_last_len = 0 if pad_first else pad_len
+        pad = (0, 0, pad_first_len, pad_last_len)
+        return F.pad(input=data, pad=pad, mode="constant", value=pad_idx)
+    else:
+        return data

@@ -7,6 +7,7 @@ from commons.util import normpath
 
 from dataset import CustomIterator
 from util import (log_data, log_model, log_step, save_eval_outputs, save_step)
+from model.util import get_pad_idx, pad_to_shape
 
 
 class Runner():
@@ -70,14 +71,14 @@ class Runner():
                               sort_key=lambda x: (len(x.src), len(x.tgt)),
                               train=train)
 
-    def repackage_hidden(self, h):
-        """
-        Wraps hidden states in new Tensors, to detach them from their history.
-        """
-        if isinstance(h, torch.Tensor):
-            return h.detach()
-        else:
-            return tuple(self.repackage_hidden(v) for v in h)
+    # def repackage_hidden(self, h):
+    #     """
+    #     Wraps hidden states in new Tensors, to detach them from their history.
+    #     """
+    #     if isinstance(h, torch.Tensor):
+    #         return h.detach()
+    #     else:
+    #         return tuple(self.repackage_hidden(v) for v in h)
 
     def run_training(self, debug, epochs, log_interval, checkpoint_dir,
                      batch_size):
@@ -138,9 +139,7 @@ class Runner():
             # this makes them a continuous chunk, and will speed up forward
             # pass. Currently, only rnn model supports flatten_parameters
             # function.
-            if best_model.model_type in [
-                    'RNN_TANH', 'RNN_RELU', 'LSTM', 'GRU'
-            ]:
+            if self.is_rnn(best_model):
                 best_model.rnn.flatten_parameters()
 
         # Run on test data.
@@ -169,23 +168,14 @@ class Runner():
                                    device=self.device,
                                    batch_size=batch_size)
 
-        # Hidden layers:
-        hidden = self.init_hidden(self.model, batch_size)
-
         for i, batch in enumerate(batches):
-            # Data:
-            src, tgt = batch.src, batch.tgt
-
             self.optimizer.zero_grad()
 
             # Forward:
-            output, hidden = self.forward(model=self.model,
-                                          input=src,
-                                          targets=tgt,
-                                          hidden=hidden)
+            output = self.forward(model=self.model, batch=batch)
 
             # Loss and optimization:
-            loss = self.compute_loss(output=output, targets=tgt)
+            loss = self.compute_loss(output=output, targets=batch.tgt)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
             self.optimizer.step()
@@ -228,32 +218,23 @@ class Runner():
                                    device=self.device,
                                    batch_size=batch_size)
 
-        # Hidden layers:
-        hidden = self.init_hidden(model, batch_size)
-
         with torch.no_grad():
             for i, batch in enumerate(batches):
-                # Data:
-                src, tgt, files = batch.src, batch.tgt, batch.file
-
                 # Forward:
-                output = self.forward(model=model,
-                                      input=src,
-                                      targets=tgt,
-                                      hidden=hidden)
+                output = self.forward(model=model, batch=batch)
 
                 # Loss:
                 total_loss += self.compute_loss(output=output,
-                                                targets=tgt).item()
+                                                targets=batch.tgt).item()
 
                 # Accuracy:
                 total_acc += self.compute_accuracy(output=output,
-                                                   targets=tgt).item()
+                                                   targets=batch.tgt).item()
 
                 # Save outputs:
                 output = output[-1]
-                tgt = tgt[-1]
-                files = files[-1]
+                tgt = batch.tgt[-1]
+                files = batch.file[-1]
                 save_eval_outputs(outputs=output,
                                   targets=tgt,
                                   files=files,
@@ -271,37 +252,30 @@ class Runner():
         ppl = math.exp(loss)
         return loss, accuracy, ppl
 
-    def init_hidden(self, model, batch_size):
+    def forward(self, model, batch):
         if self.is_rnn(model):
-            hidden = model.init_hidden(batch_size)
+            # hidden = self.repackage_hidden(hidden)
+            hidden = model.init_hidden(batch_size=batch.batch_size)
+            output, _ = model.forward(input=batch.src, hidden=hidden)
         else:
-            hidden = None
-        return hidden
-
-    def forward(self, model, input, targets, hidden):
-        if self.is_rnn(model):
-            hidden = self.repackage_hidden(hidden)
-            output, hidden = model.forward(input=input, hidden=hidden)
-        else:
-            output = model.forward(input=input, targets=targets)
-        return output, hidden
+            output = model.forward(input=batch.src, targets=batch.tgt)
+        return output
 
     def compute_loss(self, output, targets):
-        # total_loss += len(data) * criterion(output, targets).item()
-        # output = output.view(-1, output.size(-1))
-        # targets = targets.view(-1)
-        output = output[-1]
-        targets = targets[-1]
+        targets = pad_to_shape(targets, output.shape, self.tgt_vocab)
+        targets = targets.view(-1)
+        output = output.view(-1, output.size(-1))
         return self.criterion(output, targets)
 
     def compute_accuracy(self, output, targets):
         # As the targets are shifted right (the first index is BOS token),
         # we will consider since the second index:
-        output = output[1:]
-        targets = targets[1:]
+        targets = pad_to_shape(targets, output.shape, self.tgt_vocab)
+        targets = targets.view(-1)
+        output = output.view(-1, output.size(-1))
+        output = output.argmax(-1)
 
-        output_labels = torch.argmax(output, dim=-1)
-        corrects = (output_labels == targets)
+        corrects = (output == targets)
         total = targets.nelement()
         return corrects.sum() / total
 

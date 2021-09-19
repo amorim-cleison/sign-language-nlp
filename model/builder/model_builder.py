@@ -26,10 +26,7 @@ class ModelBuilder():
         self.tgt_vocab = tgt_vocab
 
     def build(self, **kwargs):
-        try:
-            return self.do_build(**kwargs)
-        except Exception as e:
-            raise Exception(f"Failed to build dataset: {repr(e)}")
+        return self.do_build(**kwargs)
 
     def do_build(self, cuda, model_args, training_args, **kwargs):
         # ------------------------------------------------

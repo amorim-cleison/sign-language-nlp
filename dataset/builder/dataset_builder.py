@@ -20,10 +20,7 @@ class DatasetBuilder():
         pass
 
     def build(self, debug, dataset_args, **kwargs):
-        try:
-            return self.do_build(debug, **dataset_args)
-        except Exception as e:
-            raise Exception(f"Failed to build dataset: {repr(e)}")
+        return self.do_build(debug, **dataset_args)
 
     def do_build(self,
                  debug,
@@ -115,7 +112,7 @@ class DatasetBuilder():
         TGT = Field(
             is_target=True,
             pad_first=True,
-            init_token=BOS_WORD,
+            # init_token=BOS_WORD,
             #  eos_token=EOS_WORD,
             pad_token=PAD_WORD,
             fix_length=None)

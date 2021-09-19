@@ -1,8 +1,10 @@
 import torch.nn as nn
+import model.util as util
+import torch.nn.utils.rnn as t
 
 
 class RNNModel(nn.Module):
-    """Container module with an encoder, a recurrent module, and a decoder."""
+    """Container module with an encoder, a recurrent module, and a linear."""
     def __init__(self,
                  rnn,
                  model_type,
@@ -15,36 +17,40 @@ class RNNModel(nn.Module):
                  tie_weights=False,
                  **kwargs):
         super(RNNModel, self).__init__()
-        self.rnn = rnn
         self.model_type = model_type
+        self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        src_ntoken = len(src_vocab)
-        tgt_ntoken = len(tgt_vocab)
+        self.src_vocab = src_vocab
+        self.tgt_vocab = tgt_vocab
+        self.src_ntoken = len(src_vocab)
+        self.tgt_ntoken = len(tgt_vocab)
+        src_pad_idx = util.get_pad_idx(src_vocab)
 
+        # Layers:
+        self.encoder = nn.Embedding(num_embeddings=self.src_ntoken,
+                                    embedding_dim=self.input_size,
+                                    padding_idx=src_pad_idx)
         self.drop = nn.Dropout(p=dropout)
-        self.encoder = nn.Embedding(num_embeddings=src_ntoken,
-                                    embedding_dim=input_size)
-        self.decoder = nn.Linear(in_features=hidden_size,
-                                 out_features=tgt_ntoken)
+        self.rnn = rnn
+        self.linear = nn.Linear(in_features=self.hidden_size,
+                                out_features=self.tgt_ntoken)
+        # self.sigmoid = nn.Sigmoid()
+        self.softmax = nn.functional.log_softmax
 
         # Optionally tie weights as in:
         # "Using the Output Embedding to Improve Language Models"
-        # (Press & Wolf 2016)
-        # https://arxiv.org/abs/1608.05859
+        # (Press & Wolf 2016) https://arxiv.org/abs/1608.05859
         # and
         # "Tying Word Vectors and Word Classifiers: A Loss Framework for
         # Language Modeling" (Inan et al. 2016)
         # https://arxiv.org/abs/1611.01462
         if tie_weights:
-            assert (hidden_size == input_size),\
+            assert (self.hidden_size == self.input_size),\
                 'When using the tied flag, `hidden_size` must be equal to '\
                 '`input_size`'
-            self.decoder.weight = self.encoder.weight
-
+            self.linear.weight = self.encoder.weight
         self.init_weights()
-        # self.sigmoid = nn.Sigmoid()
-        self.softmax = nn.functional.log_softmax
 
     def to(self, device):
         self.device = device
@@ -53,16 +59,30 @@ class RNNModel(nn.Module):
     def init_weights(self):
         initrange = 0.1
         nn.init.uniform_(self.encoder.weight, -initrange, initrange)
-        nn.init.zeros_(self.decoder.weight)
-        nn.init.uniform_(self.decoder.weight, -initrange, initrange)
+        nn.init.zeros_(self.linear.bias)
+        nn.init.uniform_(self.linear.weight, -initrange, initrange)
 
     def forward(self, input, hidden, **kwargs):
-        emb = self.drop(self.encoder(input))
-        output, hidden = self.rnn(emb, hidden)   # FIXME: error on last batch: Expected hidden[0] size (6, 15, 2048), got [6, 50, 2048]
+        seq_lengths = util.generate_seq_lengths(data=input,
+                                                vocab=self.src_vocab)
+        output = self.encoder(input)
         output = self.drop(output)
-        output = self.decoder(output)
-        # return F.log_softmax(decoded, dim=1), hidden
-        output = self.softmax(output, dim=-1)   # FIXME: confirm if softmax is correct here
+
+        # Pack:
+        output = t.pack_padded_sequence(input=output,
+                                        lengths=seq_lengths,
+                                        batch_first=False,
+                                        enforce_sorted=False)
+
+        # Forward:
+        output, hidden = self.rnn(output, hidden)
+
+        # Unpack:
+        output, _ = t.pad_packed_sequence(sequence=output, batch_first=False)
+
+        output = self.drop(output)
+        output = self.linear(output)
+        output = self.softmax(output, dim=-1)
         return output, hidden
 
     def init_hidden(self, batch_size):
