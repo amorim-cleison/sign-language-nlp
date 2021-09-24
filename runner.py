@@ -5,9 +5,7 @@ import torch
 from commons.log import log
 from commons.util import normpath
 
-from dataset import CustomIterator
 from util import (log_data, log_model, log_step, save_eval_outputs, save_step)
-from model.util import get_pad_idx, pad_to_shape
 
 
 class Runner():
@@ -35,10 +33,7 @@ class Runner():
         self.file_vocab = file_vocab
 
     def run(self, debug, training_args, **kwargs):
-        # try:
         self.do_run(debug=debug, **training_args)
-        # except Exception as e:
-        #     raise Exception(f"Failed to run model: {repr(e)}")
 
     def do_run(self, seed, debug, epochs, log_interval, checkpoint_dir,
                batch_size, **kwargs):
@@ -63,22 +58,21 @@ class Runner():
     def setup_seed(self, seed):
         torch.manual_seed(seed)
 
-    def get_batches(self, data, device, batch_size, train):
-        return CustomIterator(data,
-                              batch_size=batch_size,
-                              device=device,
-                              repeat=False,
-                              sort_key=lambda x: (len(x.src), len(x.tgt)),
-                              train=train)
-
-    # def repackage_hidden(self, h):
-    #     """
-    #     Wraps hidden states in new Tensors, to detach them from their history.
-    #     """
-    #     if isinstance(h, torch.Tensor):
-    #         return h.detach()
-    #     else:
-    #         return tuple(self.repackage_hidden(v) for v in h)
+    def get_batches(self, data, device, batch_size, train, drop_odds=True):
+        from torchtext.data import BucketIterator
+        batches = BucketIterator(dataset=data,
+                                 batch_size=batch_size,
+                                 device=device,
+                                 train=train,
+                                 repeat=False,
+                                 shuffle=True,
+                                 sort=True,
+                                 sort_key=lambda x: len(x.src))
+        if drop_odds and (len(data) >= batch_size):
+            batches = [b for b in batches if len(b) == batch_size]
+        else:
+            batches = [b for b in batches]
+        return batches, len(batches)
 
     def run_training(self, debug, epochs, log_interval, checkpoint_dir,
                      batch_size):
@@ -163,16 +157,20 @@ class Runner():
         self.model.train()
         total_loss = 0.
         start_time = time.time()
-        batches = self.get_batches(data=data_source,
-                                   train=True,
-                                   device=self.device,
-                                   batch_size=batch_size)
+        batches, n_batches = self.get_batches(data=data_source,
+                                              train=True,
+                                              device=self.device,
+                                              batch_size=batch_size)
+
+        hidden = self.init_hidden(model=self.model, batch_size=batch_size)
 
         for i, batch in enumerate(batches):
             self.optimizer.zero_grad()
 
             # Forward:
-            output = self.forward(model=self.model, batch=batch)
+            output, hidden = self.forward(model=self.model,
+                                          batch=batch,
+                                          hidden=hidden)
 
             # Loss and optimization:
             loss = self.compute_loss(output=output, targets=batch.tgt)
@@ -187,7 +185,7 @@ class Runner():
                 elapsed = time.time() - start_time
                 step_data = {
                     "epoch": f"{epoch:3d}",
-                    "batch": f"{i:5d} /{len(batches):5d}",
+                    "batch": f"{i:5d} /{n_batches:5d}",
                     "lr": f"{self.scheduler.get_last_lr()[0]:02.5f}",
                     "ms/batch": f"{elapsed * 1000 / log_interval:5.2f}",
                     "loss": f"{cur_loss:5.2f}",
@@ -213,15 +211,19 @@ class Runner():
         model.eval()
         total_loss = 0.
         total_acc = 0.
-        batches = self.get_batches(data=data_source,
-                                   train=False,
-                                   device=self.device,
-                                   batch_size=batch_size)
+        batches, n_batches = self.get_batches(data=data_source,
+                                              train=False,
+                                              device=self.device,
+                                              batch_size=batch_size)
+
+        hidden = self.init_hidden(model=self.model, batch_size=batch_size)
 
         with torch.no_grad():
             for i, batch in enumerate(batches):
                 # Forward:
-                output = self.forward(model=model, batch=batch)
+                output, hidden = self.forward(model=model,
+                                              batch=batch,
+                                              hidden=hidden)
 
                 # Loss:
                 total_loss += self.compute_loss(output=output,
@@ -232,9 +234,9 @@ class Runner():
                                                    targets=batch.tgt).item()
 
                 # Save outputs:
-                output = output[-1]
-                tgt = batch.tgt[-1]
-                files = batch.file[-1]
+                output = output.squeeze()
+                tgt = batch.tgt.squeeze()
+                files = batch.file.squeeze()
                 save_eval_outputs(outputs=output,
                                   targets=tgt,
                                   files=files,
@@ -247,35 +249,29 @@ class Runner():
                 if debug:
                     break
 
-        loss = total_loss / len(batches)
-        accuracy = total_acc / len(batches)
+        loss = total_loss / n_batches
+        accuracy = total_acc / n_batches
         ppl = math.exp(loss)
         return loss, accuracy, ppl
 
-    def forward(self, model, batch):
+    def forward(self, model, batch, hidden):
+        src, lengths = batch.src
+
         if self.is_rnn(model):
-            # hidden = self.repackage_hidden(hidden)
-            hidden = model.init_hidden(batch_size=batch.batch_size)
-            output, _ = model.forward(input=batch.src, hidden=hidden)
+            hidden = self.repackage_hidden(hidden)
+            output, hidden = model.forward(input=src,
+                                           lengths=lengths,
+                                           hidden=hidden)
         else:
-            output = model.forward(input=batch.src, targets=batch.tgt)
-        return output
+            output = model.forward(input=src, targets=batch.tgt)
+        return output, hidden
 
     def compute_loss(self, output, targets):
-        targets = pad_to_shape(targets, output.shape, self.tgt_vocab)
-        targets = targets.view(-1)
-        output = output.view(-1, output.size(-1))
-        return self.criterion(output, targets)
+        return self.criterion(output.squeeze(), targets.squeeze())
 
     def compute_accuracy(self, output, targets):
-        # As the targets are shifted right (the first index is BOS token),
-        # we will consider since the second index:
-        targets = pad_to_shape(targets, output.shape, self.tgt_vocab)
-        targets = targets.view(-1)
-        output = output.view(-1, output.size(-1))
-        output = output.argmax(-1)
-
-        corrects = (output == targets)
+        output = output.squeeze().argmax(-1)
+        corrects = output.eq(targets.squeeze())
         total = targets.nelement()
         return corrects.sum() / total
 
@@ -300,3 +296,18 @@ class Runner():
     def is_rnn(self, model):
         from model.base import RNNModel
         return isinstance(model, RNNModel)
+
+    def repackage_hidden(self, h):
+        """
+        Wraps hidden states in new Tensors, to detach them from their history.
+        """
+        if isinstance(h, torch.Tensor):
+            return h.detach()
+        else:
+            return tuple(self.repackage_hidden(v) for v in h)
+
+    def init_hidden(self, model, batch_size):
+        if self.is_rnn(model):
+            return model.init_hidden(batch_size=batch_size)
+        else:
+            return None

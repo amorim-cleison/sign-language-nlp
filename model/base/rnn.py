@@ -35,7 +35,6 @@ class RNNModel(nn.Module):
         self.rnn = rnn
         self.linear = nn.Linear(in_features=self.hidden_size,
                                 out_features=self.tgt_ntoken)
-        # self.sigmoid = nn.Sigmoid()
         self.softmax = nn.functional.log_softmax
 
         # Optionally tie weights as in:
@@ -62,28 +61,23 @@ class RNNModel(nn.Module):
         nn.init.zeros_(self.linear.bias)
         nn.init.uniform_(self.linear.weight, -initrange, initrange)
 
-    def forward(self, input, hidden, **kwargs):
-        seq_lengths = util.generate_seq_lengths(data=input,
-                                                vocab=self.src_vocab)
+    def forward(self, input, lengths, hidden, **kwargs):
         output = self.encoder(input)
         output = self.drop(output)
 
         # Pack:
         output = t.pack_padded_sequence(input=output,
-                                        lengths=seq_lengths,
+                                        lengths=lengths,
                                         batch_first=False,
                                         enforce_sorted=False)
 
         # Forward:
-        output, hidden = self.rnn(output, hidden)
+        output, (ht, ct) = self.rnn(output, hidden)
+        # output, (ht, ct) = self.rnn(output)
 
-        # Unpack:
-        output, _ = t.pad_packed_sequence(sequence=output, batch_first=False)
-
-        output = self.drop(output)
-        output = self.linear(output)
+        output = self.linear(ht[-1])
         output = self.softmax(output, dim=-1)
-        return output, hidden
+        return output, (ht, ct)
 
     def init_hidden(self, batch_size):
         weight = next(self.parameters())

@@ -1,15 +1,13 @@
 import json
 import tempfile
 
+import numpy as np
+import pandas as pd
 from commons.log import auto_log_progress
 from commons.util import (delete_file, exists, filename, filter_files,
                           read_json, save_items)
+from dataset.constant import PAD_WORD, UNK_WORD
 from torchtext.data import Field, TabularDataset
-
-from dataset.constant import BOS_WORD, EOS_WORD, PAD_WORD, UNK_WORD
-
-import pandas as pd
-import numpy as np
 
 
 class DatasetBuilder():
@@ -102,20 +100,15 @@ class DatasetBuilder():
         def preprocess_src(rows):
             return self.preprocess_src(rows, fields, composition_strategy)
 
-        # FIX_LENGTH = 10  # FIXME: verify this -> check if it's possible to count dinamically
-
         # Fields:
         SRC = Field(pad_token=PAD_WORD,
                     unk_token=UNK_WORD,
                     preprocessing=preprocess_src,
-                    fix_length=None)
+                    include_lengths=True)
         TGT = Field(
             is_target=True,
             pad_first=True,
-            # init_token=BOS_WORD,
-            #  eos_token=EOS_WORD,
-            pad_token=PAD_WORD,
-            fix_length=None)
+            pad_token=PAD_WORD)
         FILE = Field()
 
         # Dataset:

@@ -12,5 +12,4 @@ class RNNRelu(RNNModel):
         return nn.RNN(input_size=input_size,
                       hidden_size=hidden_size,
                       num_layers=num_layers,
-                      nonlinearity="relu",
-                      dropout=dropout)
+                      nonlinearity="relu")

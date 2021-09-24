@@ -45,8 +45,8 @@ def save_eval_outputs(outputs,
     import torch
     from commons.util import create_if_missing, normpath, save_csv
 
-    def greedy_decode(indexes, vocab):
-        return vocab.itos[indexes]
+    def greedy_decode(index, vocab):
+        return vocab.itos[index]
         # d = [vocab.itos[i] for i in indexes]
         # return d[0] if len(d) == 1 else d
 

@@ -11,5 +11,4 @@ class GRU(RNNModel):
     def build(self, input_size, hidden_size, num_layers, dropout, **kwargs):
         return nn.GRU(input_size=input_size,
                       hidden_size=hidden_size,
-                      num_layers=num_layers,
-                      dropout=dropout)
+                      num_layers=num_layers)

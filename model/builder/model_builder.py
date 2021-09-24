@@ -3,6 +3,7 @@ import torch.nn as nn
 from commons.log import log
 
 from model import GRU, LSTM, RNNRelu, RNNTanh, Transformer
+from model.util import get_pad_idx
 
 
 class ModelBuilder():
@@ -64,7 +65,8 @@ class ModelBuilder():
 
     def build_criterion(self, **kwargs):
         # return nn.NLLLoss()
-        return nn.CrossEntropyLoss(ignore_index=1)
+        pad_idx = get_pad_idx(self.tgt_vocab)
+        return nn.CrossEntropyLoss(ignore_index=pad_idx)
 
     def build_optimizer(self, model, lr, **kwargs):
         # return torch.optim.Adam(model.parameters(),
