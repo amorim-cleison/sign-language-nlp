@@ -4,8 +4,9 @@ import time
 import torch
 from commons.log import log
 from commons.util import normpath
+from torch.nn.utils import clip_grad_norm_
 
-from util import (log_data, log_model, log_step, save_eval_outputs, save_step)
+from util import log_data, log_model, log_step, save_eval_outputs, save_step
 
 
 class Runner():
@@ -36,24 +37,30 @@ class Runner():
         self.do_run(debug=debug, **training_args)
 
     def do_run(self, seed, debug, epochs, log_interval, checkpoint_dir,
-               batch_size, **kwargs):
+               batch_size, clip, **kwargs):
         self.log_objects()
 
         # ------------------------------------------------
         # Set random seed manually (for reproducibility):
         # ------------------------------------------------
-        self.setup_seed(seed)
+        self.setup_seed(seed=seed)
 
         # ------------------------------------------------
         # Train model:
         # ------------------------------------------------
-        self.run_training(debug, epochs, log_interval, checkpoint_dir,
-                          batch_size)
+        self.run_training(debug=debug,
+                          epochs=epochs,
+                          log_interval=log_interval,
+                          checkpoint_dir=checkpoint_dir,
+                          batch_size=batch_size,
+                          clip=clip)
 
         # ------------------------------------------------
         # Test model:
         # ------------------------------------------------
-        self.run_test(debug, checkpoint_dir, batch_size)
+        self.run_test(debug=debug,
+                      checkpoint_dir=checkpoint_dir,
+                      batch_size=batch_size)
 
     def setup_seed(self, seed):
         torch.manual_seed(seed)
@@ -75,7 +82,7 @@ class Runner():
         return batches, len(batches)
 
     def run_training(self, debug, epochs, log_interval, checkpoint_dir,
-                     batch_size):
+                     batch_size, clip):
         best_val_loss = float("inf")
         checkpoint_path = normpath(f"{checkpoint_dir}/weights.pt")
 
@@ -88,7 +95,8 @@ class Runner():
                            data_source=self.train_data,
                            log_interval=log_interval,
                            checkpoint_dir=checkpoint_dir,
-                           batch_size=batch_size)
+                           batch_size=batch_size,
+                           clip=clip)
 
                 val_loss, val_acc, val_ppl = self.evaluate(
                     debug=debug,
@@ -152,7 +160,7 @@ class Runner():
         save_step("test", checkpoint_dir, **step_data)
 
     def train(self, debug, epoch, data_source, log_interval, checkpoint_dir,
-              batch_size):
+              batch_size, clip):
         # Turn on training mode which enables dropout.
         self.model.train()
         total_loss = 0.
@@ -175,7 +183,7 @@ class Runner():
             # Loss and optimization:
             loss = self.compute_loss(output=output, targets=batch.tgt)
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
+            clip_grad_norm_(self.model.parameters(), clip)
             self.optimizer.step()
 
             total_loss += loss.item()

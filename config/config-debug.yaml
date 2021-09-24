@@ -42,5 +42,6 @@ training_args:
   lr: 0.50
   lr_step_gamma: 0.95
   lr_step_size: 1
+  clip: 0.5
   log_interval: 5
   checkpoint_dir: ../../work/sl-transformer/checkpoint

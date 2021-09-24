@@ -76,7 +76,7 @@ class RNNModel(nn.Module):
         # output, (ht, ct) = self.rnn(output)
 
         output = self.linear(ht[-1])
-        output = self.softmax(output, dim=-1)
+        # output = self.softmax(output, dim=-1)
         return output, (ht, ct)
 
     def init_hidden(self, batch_size):
