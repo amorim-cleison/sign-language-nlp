@@ -15,6 +15,7 @@ class RNNModel(nn.Module):
                  tgt_vocab,
                  dropout=0.5,
                  tie_weights=False,
+                 batch_first=False,
                  **kwargs):
         super(RNNModel, self).__init__()
         self.model_type = model_type
@@ -25,6 +26,7 @@ class RNNModel(nn.Module):
         self.tgt_vocab = tgt_vocab
         self.src_ntoken = len(src_vocab)
         self.tgt_ntoken = len(tgt_vocab)
+        self.batch_first = batch_first
         src_pad_idx = util.get_pad_idx(src_vocab)
 
         # Layers:
@@ -52,6 +54,10 @@ class RNNModel(nn.Module):
         self.init_weights()
 
     def to(self, device):
+        self.encoder = self.encoder.to(device)
+        self.drop = self.drop.to(device)
+        self.rnn = self.rnn.to(device)
+        self.linear = self.linear.to(device)
         self.device = device
         return super().to(device)
 
@@ -61,24 +67,31 @@ class RNNModel(nn.Module):
         nn.init.zeros_(self.linear.bias)
         nn.init.uniform_(self.linear.weight, -initrange, initrange)
 
-    def forward(self, input, lengths, hidden, **kwargs):
-        output = self.encoder(input)
+    def forward(self, X, lengths=None, hidden=None, **kwargs):
+        if lengths is None:
+            lengths = util.resolve_lengths(X, self.src_vocab)
+
+        output = self.encoder(X)
         output = self.drop(output)
 
         # Pack:
         output = t.pack_padded_sequence(input=output,
                                         lengths=lengths,
-                                        batch_first=False,
+                                        batch_first=self.batch_first,
                                         enforce_sorted=False)
 
         # Forward:
         output, (ht, ct) = self.rnn(output, hidden)
-        # output, (ht, ct) = self.rnn(output)
 
         output = self.linear(ht[-1])
         # output = self.softmax(output, dim=-1)
-        return output, (ht, ct)
+        return output
 
     def init_hidden(self, batch_size):
         weight = next(self.parameters())
-        return weight.new_zeros(self.num_layers, batch_size, self.hidden_size)
+        dims = (self.num_layers, batch_size, self.hidden_size)
+
+        if self.batch_first:
+            dims = dims.permute(1, 0)
+
+        return weight.new_zeros(*dims).to(self.device)

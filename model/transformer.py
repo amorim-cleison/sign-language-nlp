@@ -16,6 +16,7 @@ class Transformer(nn.Module):
                  src_vocab,
                  tgt_vocab,
                  device=None,
+                 batch_first=False,
                  **kwargs):
         super(Transformer, self).__init__()
         self.model_type = 'Transformer'
@@ -23,6 +24,7 @@ class Transformer(nn.Module):
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
         self.device = device
+        self.batch_first = batch_first
         src_ntoken = len(src_vocab)
         tgt_ntoken = len(tgt_vocab)
 
@@ -54,12 +56,12 @@ class Transformer(nn.Module):
         self.device = device
         return super().to(device)
 
-    def forward(self, input, targets, **kwargs):
-        assert (input is not None), "`input` is a required paramenter"
-        assert (targets is not None), "`targets` is a required paramenter"
+    def forward(self, X, y, **kwargs):
+        assert (X is not None), "`input` is a required paramenter"
+        assert (y is not None), "`targets` is a required paramenter"
 
-        src = input
-        tgt = targets
+        src = self.adjust_batch(X)
+        tgt = self.adjust_batch(y.unsqueeze(-1))
 
         # Masks:
         src_mask = generate_mask(src).to(self.device)
@@ -84,7 +86,15 @@ class Transformer(nn.Module):
                                   tgt_key_padding_mask=tgt_padding_mask)
         output = self.linear(output)
         output = self.softmax(output, dim=-1)
-        return output
+        return self.adjust_batch(output).squeeze()
+
+    def adjust_batch(self, data):
+        """Transformer requires to be in the shape `(S,N,E)` where `S` is the
+        sequence length, `N` batch size, and `E` is the feature number."""
+        if (self.batch_first and data.ndim > 1):
+            return data.transpose(0, 1)
+        else:
+            return data
 
     def forward_embedding(self, x, embedding, pos_encoding):
         x = embedding(x) * math.sqrt(self.input_size)

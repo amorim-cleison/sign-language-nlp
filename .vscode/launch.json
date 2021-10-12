@@ -32,5 +32,14 @@
             "justMyCode": false,
             "args": ["-c", "config/config-debug.yaml"]
         },
+        {
+            "name": "Grid",
+            "type": "python",
+            "request": "launch",
+            "module": "optimize",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-grid.yaml"]
+        },
     ]
 }

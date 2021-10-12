@@ -3,11 +3,11 @@ log: Null
 cuda: False
 seed: 1
 
-criterion: torch.nn.CrossEntropyLoss
-optimizer: torch.optim.SGD
 model: model.LSTM
-# model: model.Transformer
-
+mode: train
+# mode: grid
+resumable: True
+workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
 
 dataset_args:
   dataset_dir: ../../work/dataset/asl-phono/phonology/3d
@@ -33,36 +33,29 @@ model_args:
   # Transformer:
   num_heads: 8
 
-# model_args:
-#   input_size: 512
-#   hidden_size: 2048
-#   num_layers: 2
-#   dropout: 0.3
 
 training_args:
-  resume: True
-  epochs: 100 # Original: 100
+  criterion: torch.nn.CrossEntropyLoss
+  optimizer: torch.optim.SGD
+  max_epochs: 10 # Original: 100
   batch_size: 50
   lr: 0.50
-  lr_scheduler:
+  early_stopping:
+    patience: 20
+  gradient_clipping:
+    gradient_clip_value: 0.5
+  lr_scheduler: 
     policy: ReduceLROnPlateau
     factor: 0.95
     patience: 2
-  log_interval: 5
-  checkpoint_dir: ../../work/sl-transformer/checkpoint
-  gradient_clipping:
-    gradient_clip_value: 0.5
-  early_stopping:
-    patience: 20
 
-# training_args:
-#   seed: 1
-#   epochs: 100 # Original: 100
-#   batch_size: 50
-#   # warm_up: 400 # Original: 4000
-#   lr: 0.50
-#   lr_step_gamma: 0.95
-#   lr_step_size: 1
-#   clip: 0.5
-#   log_interval: 5
-#   checkpoint_dir: ../../work/sl-transformer/checkpoint
+
+grid_args:
+  verbose: 3
+  scoring: accuracy
+  model_args:
+    input_size: [512]
+  training_args:
+    lr: [0.10]
+    max_epochs: [2]
+    

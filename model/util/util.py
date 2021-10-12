@@ -44,5 +44,13 @@ def generate_padding_mask(data, vocab):
     value of ``False`` will be unchanged.
     """
     pad_idx = get_pad_idx(vocab)
-    mask = (data == pad_idx).transpose(0, 1).bool()
+    mask = (data == pad_idx).bool()
+
+    if mask.ndim >= 2:
+        mask = mask.transpose(0, 1)
     return mask
+
+
+def resolve_lengths(data, vocab, dim=-1):
+    pad_idx = get_pad_idx(vocab)
+    return data.size(dim) - data.eq(pad_idx).sum(dim=dim)
