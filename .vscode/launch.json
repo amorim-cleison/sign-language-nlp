@@ -11,35 +11,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-debug.yaml"]
-        },
-        {
-            "name": "Run Main + Commons",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "preLaunchTask": "refresh-poetry",
-            "args": ["-c", "config/config-debug.yaml"]
-        },
-        {
-            "name": "Optimize",
-            "type": "python",
-            "request": "launch",
-            "module": "optimize",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-debug.yaml"]
-        },
-        {
-            "name": "Grid",
-            "type": "python",
-            "request": "launch",
-            "module": "optimize",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-grid.yaml"]
-        },
+            "args": ["-c", "config/config-grid-lstm.yaml"]
+        }
     ]
 }

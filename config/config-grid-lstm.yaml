@@ -1,12 +1,12 @@
 debug: True
-log: Null
+log: ../../work/sl-transformer/log
 cuda: False
 seed: 1
 
 model: model.LSTM
-mode: train
-# mode: grid
-resumable: True
+# mode: train
+mode: grid
+resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
 
 dataset_args:
@@ -31,13 +31,13 @@ model_args:
   num_layers: 6
   dropout: 0.1
   # Transformer:
-  num_heads: 8
+  # num_heads: 8
 
 
 training_args:
   criterion: torch.nn.CrossEntropyLoss
   optimizer: torch.optim.SGD
-  max_epochs: 10 # Original: 100
+  max_epochs: 100 # Original: 100
   batch_size: 50
   lr: 0.50
   early_stopping:
@@ -54,8 +54,10 @@ grid_args:
   verbose: 3
   scoring: accuracy
   model_args:
-    input_size: [512]
+    input_size: [128, 512, 1024]
+    hidden_size: [128, 512, 2048]
+    num_layers: [2, 10, 20]
+    dropout: [0.1, 0.01]
   training_args:
-    lr: [0.10]
-    max_epochs: [2]
+    lr: [0.001, 0.01, 0.10]
     
