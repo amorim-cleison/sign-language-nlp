@@ -1,6 +1,6 @@
-debug: True
-log: ../../work/sl-transformer/log
-cuda: False
+debug: False
+log: ../../work/sl-transformer/grid-lstm.log
+cuda: True
 seed: 1
 
 model: model.LSTM
@@ -54,10 +54,10 @@ grid_args:
   verbose: 3
   scoring: accuracy
   model_args:
-    input_size: [128, 512, 1024]
-    hidden_size: [128, 512, 2048]
-    num_layers: [2, 10, 20]
-    dropout: [0.1, 0.01]
+    input_size: [8, 64, 128, 256, 512]
+    hidden_size: [4, 32, 125, 256, 512]
+    num_layers: [2, 4, 6, 8, 10]
+    dropout: [0.0, 0.1, 0.2, 0.3]
   training_args:
-    lr: [0.001, 0.01, 0.10]
+    lr: [0.1, 0.01, 0.05, 0.001]
     
