@@ -3,7 +3,7 @@ log: Null
 cuda: True
 seed: 1
 
-model: model.Transformer
+model: model.GRU
 # mode: train
 mode: grid
 resumable: False
@@ -30,7 +30,8 @@ model_args:
   hidden_size: 2048
   num_layers: 6
   dropout: 0.1
-  num_heads: 8
+  # Transformer:
+  # num_heads: 8
 
 
 training_args:
@@ -54,10 +55,9 @@ grid_args:
   scoring: accuracy
   model_args:
     input_size: [8, 64, 128, 256, 512]
-    hidden_size: [32, 64, 128, 256, 512, 1024, 2048]
+    hidden_size: [4, 32, 125, 256, 512, 1024]
     num_layers: [2, 4, 6, 8, 10]
     dropout: [0.0, 0.1, 0.2, 0.3]
-    num_heads: [2, 4, 8, 16]
   training_args:
     lr: [0.1, 0.01, 0.05, 0.001]
     
