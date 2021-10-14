@@ -1,0 +1,63 @@
+debug: False
+log: ../../work/sl-transformer/grid-lstm.log
+cuda: True
+seed: 1
+
+model: model.Transformer
+# mode: train
+mode: grid
+resumable: False
+workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
+
+dataset_args:
+  dataset_dir: ../../work/dataset/asl-phono/phonology/3d
+  fields: [
+    orientation_dh,
+    orientation_ndh, 
+    movement_dh, 
+    movement_ndh,
+    handshape_dh, 
+    handshape_ndh, 
+    # mouth_openness
+  ]
+  samples_min_freq: 2   # How many samples for the label should exist in dataset for the label to be considered?
+  train_split_ratio: 0.7
+  val_split_ratio: 0.1
+  composition_strategy: as_words
+
+model_args:
+  input_size: 512
+  hidden_size: 2048
+  num_layers: 6
+  dropout: 0.1
+  num_heads: 8
+
+
+training_args:
+  criterion: torch.nn.CrossEntropyLoss
+  optimizer: torch.optim.SGD
+  max_epochs: 100 # Original: 100
+  batch_size: 50
+  lr: 0.50
+  early_stopping:
+    patience: 20
+  gradient_clipping:
+    gradient_clip_value: 0.5
+  lr_scheduler: 
+    policy: ReduceLROnPlateau
+    factor: 0.95
+    patience: 2
+
+
+grid_args:
+  verbose: 3
+  scoring: accuracy
+  model_args:
+    input_size: [8, 64, 128, 256, 512]
+    hidden_size: [32, 64, 128, 256, 512, 1024, 2048]
+    num_layers: [2, 4, 6, 8, 10]
+    dropout: [0.0, 0.1, 0.2, 0.3]
+    num_heads: [2, 4, 8, 16]
+  training_args:
+    lr: [0.1, 0.01, 0.05, 0.001]
+    

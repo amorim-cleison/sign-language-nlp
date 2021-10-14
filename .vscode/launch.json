@@ -12,6 +12,15 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": ["-c", "config/config-grid-lstm.yaml"]
+        },
+        {
+            "name": "Grid - LSTM",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False"]
         }
     ]
 }
