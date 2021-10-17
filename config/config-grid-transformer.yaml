@@ -52,9 +52,9 @@ grid_args:
   scoring: accuracy
   n_jobs: 1
   model_args:
-    input_size: [8, 64, 128, 256, 512]
-    hidden_size: [32, 64, 128, 256, 512, 1024, 2048]
-    num_layers: [2, 4, 6, 8, 10]
+    input_size: [64, 128, 256, 512]
+    hidden_size: [128, 256, 512, 1024, 2048]
+    num_layers: [2, 6, 10]
     dropout: [0.0, 0.1, 0.2, 0.3]
     num_heads: [2, 4, 8, 16]
   training_args:
