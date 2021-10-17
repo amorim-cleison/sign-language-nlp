@@ -3,23 +3,27 @@ from commons.log import log
 from commons.util import load_args, save_json
 from sklearn.model_selection import GridSearchCV
 from skorch import NeuralNetClassifier
+from skorch.helper import SliceDataset
 
 import helper as h
 from args import ARGUMENTS
-from dataset.builder import DatasetBuilder
+from dataset import AslDataset
 
 
 def run(args):
-    dataset_objs = DatasetBuilder().build(**args)
     args["workdir"] = h.format_dir(args["workdir"], **args)
-
-    # Dataset:
-    ds = dataset_objs["dataset"]
-    X, X_lens = h.get_processed(ds, "src")
-    y = h.get_processed(ds, "tgt").squeeze()
 
     # Seed:
     h.setup_seed(**args)
+
+    # Device:
+    device = h.prepare_device(args["cuda"])
+
+    # Dataset:
+    dataset = AslDataset(device=device,
+                         batch_first=True,
+                         debug=args["debug"],
+                         **args["dataset_args"])
 
     # Callbacks:
     callbacks, callbacks_names = h.build_callbacks(model=args["model"],
@@ -29,25 +33,33 @@ def run(args):
                                                    **args["training_args"])
 
     # Classifier:
-    net_params = h.build_net_params(dataset_objs=dataset_objs,
-                                    callbacks=callbacks,
+    net_params = h.build_net_params(callbacks=callbacks,
                                     callbacks_names=callbacks_names,
+                                    device=device,
+                                    dataset=dataset,
                                     **args)
     net = NeuralNetClassifier(**net_params)
 
     # Train:
     if args["mode"] == "train":
-        net.fit({"X": X.permute(1, 0), "lengths": X_lens}, y)
+        net.fit(dataset, None)
 
     # Grid search:
-    if args["mode"] == "grid":
-        run_grid_search(net=net, callbacks_names=callbacks_names, X=X, y=y)
+    elif args["mode"] == "grid":
+        run_grid_search(net=net,
+                        callbacks_names=callbacks_names,
+                        dataset=dataset)
 
 
-def run_grid_search(net, callbacks_names, X, y):
+def run_grid_search(net, callbacks_names, dataset):
+    # Slice data (sklearn is not compatible with 'dataset'):
+    X = SliceDataset(dataset, idx=0)
+    y = SliceDataset(dataset, idx=1)
+
+    # Grid search:
     grid_params = h.build_grid_params(callbacks_names=callbacks_names, **args)
     gs = GridSearchCV(net, **grid_params)
-    gs.fit(X.permute(1, 0), y)
+    gs.fit(X, y)
 
     # Output:
     gs_output = {

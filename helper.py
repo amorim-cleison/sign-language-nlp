@@ -22,8 +22,8 @@ def prepare_device(cuda):
     return torch.device("cuda" if cuda else "cpu")
 
 
-def build_net_params(dataset_objs, training_args, model_args, dataset_args,
-                     cuda, model, mode, resumable, callbacks, callbacks_names,
+def build_net_params(training_args, model_args, dataset_args, model, mode,
+                     resumable, callbacks, callbacks_names, device, dataset,
                      **kwargs):
     # Configure params:
     training_args["criterion"] = locate(training_args["criterion"])
@@ -39,9 +39,9 @@ def build_net_params(dataset_objs, training_args, model_args, dataset_args,
     # Module args:
     module_args = prefix_args("module",
                               ensure_list=False,
-                              batch_first=True,
-                              src_vocab=dataset_objs["src_vocab"],
-                              tgt_vocab=dataset_objs["tgt_vocab"],
+                              batch_first=dataset.batch_first,
+                              src_vocab=dataset.src_vocab,
+                              tgt_vocab=dataset.tgt_vocab,
                               **model_args)
 
     # Other args:
@@ -50,13 +50,16 @@ def build_net_params(dataset_objs, training_args, model_args, dataset_args,
                                 not_in=True)
 
     # CV split:
-    train_split = CVSplit(cv=dataset_args["samples_min_freq"], stratified=True)
+    train_split = CVSplit(cv=dataset_args["samples_min_freq"],
+                          stratified=False)
 
     return {
-        "device": prepare_device(cuda),
+        "device": device,
         "module": locate(model),
         "callbacks": callbacks,
         "train_split": train_split,
+        "iterator_train__collate_fn": dataset.collate_encoding,
+        "iterator_valid__collate_fn": dataset.collate_encoding,
         **module_args,
         **callbacks_args,
         **other_args
@@ -73,6 +76,7 @@ def build_grid_params(grid_args, dataset_args, callbacks_names, model, mode,
                workdir,
                mode="grid",
                scoring="accuracy",
+               n_jobs=1,
                verbose=3,
                **kwargs):
         # Callbacks args:
@@ -96,6 +100,8 @@ def build_grid_params(grid_args, dataset_args, callbacks_names, model, mode,
             "cv": dataset_args["samples_min_freq"],
             "verbose": verbose,
             "scoring": scoring,
+            "n_jobs": n_jobs,
+            "error_score": "raise",
             "param_grid": {
                 **module_args,
                 **callbacks_args,

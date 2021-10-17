@@ -7,28 +7,20 @@ from commons.log import auto_log_progress
 from commons.util import (delete_file, exists, filename, filter_files,
                           read_json, save_items)
 from dataset.constant import PAD_WORD, UNK_WORD
-from torchtext.data import Field, TabularDataset
+from torchtext.data import Field, TabularDataset, interleave_keys
 
 
 class DatasetBuilder():
-
-    BATCH_SIZE = 10
-
     def __init__(self):
         pass
 
-    def build(self, debug, dataset_args, **kwargs):
-        return self.do_build(debug, **dataset_args)
-
-    def do_build(self,
-                 debug,
-                 dataset_dir,
-                 fields,
-                 samples_min_freq,
-                 composition_strategy,
-                 train_split_ratio,
-                 val_split_ratio=None,
-                 **kwargs):
+    def build(self,
+              debug,
+              dataset_dir,
+              fields,
+              samples_min_freq,
+              batch_first,
+              composition_strategy="as_words"):
         tmp = tempfile.NamedTemporaryFile(delete=False)
 
         try:
@@ -43,22 +35,16 @@ class DatasetBuilder():
                 self.create_dataset(
                     path=tmp.name,
                     fields=fields,
-                    composition_strategy=composition_strategy)
-
-            # Splits:
-            train_data, val_data, test_data = self.split_dataset(
-                dataset=dataset,
-                train_split_ratio=train_split_ratio,
-                val_split_ratio=val_split_ratio)
+                    composition_strategy=composition_strategy,
+                    batch_first=batch_first)
 
             return {
                 "dataset": dataset,
-                "src_vocab": src_vocab,
-                "tgt_vocab": tgt_vocab,
-                "file_vocab": file_vocab,
-                "train_data": train_data,
-                "val_data": val_data,
-                "test_data": test_data
+                "vocabs": {
+                    "src": src_vocab,
+                    "tgt": tgt_vocab,
+                    "file": file_vocab
+                }
             }
         finally:
             tmp.close()
@@ -88,7 +74,7 @@ class DatasetBuilder():
 
         # Separate data chunks:
         n_samples = len(df)
-        n_batches = n_samples / self.BATCH_SIZE
+        n_batches = n_samples / 10
         batches = np.array_split(df, n_batches)
         msg = "Processing dataset... "
 
@@ -96,7 +82,7 @@ class DatasetBuilder():
             rows = batch["file"].apply(prepare_row)
             save_items(rows, path, True)
 
-    def create_dataset(self, path, fields, composition_strategy):
+    def create_dataset(self, path, fields, composition_strategy, batch_first):
         def preprocess_src(rows):
             return self.preprocess_src(rows, fields, composition_strategy)
 
@@ -104,12 +90,13 @@ class DatasetBuilder():
         SRC = Field(pad_token=PAD_WORD,
                     unk_token=UNK_WORD,
                     preprocessing=preprocess_src,
-                    include_lengths=True)
-        TGT = Field(
-            is_target=True,
-            pad_first=True,
-            pad_token=PAD_WORD)
-        FILE = Field()
+                    include_lengths=True,
+                    batch_first=batch_first)
+        TGT = Field(is_target=True,
+                    pad_first=True,
+                    pad_token=PAD_WORD,
+                    batch_first=batch_first)
+        FILE = Field(batch_first=batch_first)
 
         # Dataset:
         dataset = TabularDataset(path=path,
@@ -119,31 +106,13 @@ class DatasetBuilder():
                                      'label': ('tgt', TGT),
                                      'file': ('file', FILE)
                                  })
+        dataset.sort_key = lambda x: interleave_keys(len(x.src), len(x.tgt))
 
         # Vocabs:
         SRC.build_vocab(dataset.src)
         TGT.build_vocab(dataset.tgt)
         FILE.build_vocab(dataset.file)
         return dataset, SRC.vocab, TGT.vocab, FILE.vocab
-
-    def split_dataset(self, dataset, train_split_ratio, val_split_ratio=None):
-        if not val_split_ratio:
-            val_split_ratio = 0
-        assert (train_split_ratio + val_split_ratio <=
-                1), "Invalid train/val split ratios."
-        test_split_ratio = 1 - train_split_ratio - val_split_ratio
-
-        # ratios (parameter): [ train, test, val]
-        # output: (train, [val,] test)
-        splits = dataset.split(
-            split_ratio=[train_split_ratio, test_split_ratio, val_split_ratio])
-
-        if len(splits) == 3:
-            train, val, test = splits
-        else:
-            train, test = splits
-            val = None
-        return train, val, test
 
     def preprocess_src(self, rows, fields, composition_strategy):
         STRATEGY_FN = {

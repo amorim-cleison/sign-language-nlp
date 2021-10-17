@@ -57,11 +57,11 @@ class Transformer(nn.Module):
         return super().to(device)
 
     def forward(self, X, y, **kwargs):
-        assert (X is not None), "`input` is a required paramenter"
-        assert (y is not None), "`targets` is a required paramenter"
+        assert (X is not None), "`X` is a required paramenter"
+        assert (y is not None), "`y` is a required paramenter"
 
         src = self.adjust_batch(X)
-        tgt = self.adjust_batch(y.unsqueeze(-1))
+        tgt = self.adjust_batch(y.unsqueeze(dim=-1))
 
         # Masks:
         src_mask = generate_mask(src).to(self.device)
