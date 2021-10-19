@@ -53,22 +53,24 @@ def build_net_params(training_args, model_args, model, mode, resumable,
         "device": device,
         "module": locate(model),
         "callbacks": callbacks,
-        "iterator_train__collate_fn": dataset.collate_encoding,
-        "iterator_valid__collate_fn": dataset.collate_encoding,
+        "iterator_train__collate_fn": dataset.collate,
+        "iterator_valid__collate_fn": dataset.collate,
         **module_args,
         **callbacks_args,
         **other_args
     }
 
 
-def build_grid_params(grid_args, callbacks_names, model, mode, workdir,
-                      **kwargs):
+def build_grid_params(grid_args, net_train_split, X, y, callbacks_names, model,
+                      mode, workdir, **kwargs):
     def unpack(training_args,
                model_args,
                callbacks_names,
                model,
                workdir,
-               cv=None,
+               X,
+               y,
+               net_train_split=None,
                mode="grid",
                scoring="accuracy",
                n_jobs=None,
@@ -90,6 +92,17 @@ def build_grid_params(grid_args, callbacks_names, model, mode, workdir,
                                     keys_to_filter=callbacks_names,
                                     not_in=True)
 
+        # CV:
+        if ("train_split" in grid_args):
+            train_split = get_train_split(**grid_args)
+        elif net_train_split:
+            train_split = net_train_split
+        else:
+            train_split = get_train_split(**grid_args)
+
+        train, valid = train_split(X, y)
+        cv = [(train.indices, valid.indices)]
+
         return {
             "refit": True,
             "cv": cv,
@@ -108,6 +121,9 @@ def build_grid_params(grid_args, callbacks_names, model, mode, workdir,
                   model=model,
                   mode=mode,
                   workdir=workdir,
+                  net_train_split=net_train_split,
+                  X=X,
+                  y=y,
                   **grid_args)
 
 

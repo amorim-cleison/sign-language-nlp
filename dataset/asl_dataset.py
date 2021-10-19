@@ -40,11 +40,17 @@ class AslDataset(Dataset):
     def batch_first(self):
         return self.__batch_first
 
-    def collate_encoding(self, data):
+    def collate(self, data):
         X, y = zip(*data)
-        X, lengths = self.__process_value(X, "src")
-        y = self.__process_value(y, "tgt").squeeze()
+        X, lengths = self.collate_input(X)
+        y = self.collate_target(y)
         return {"X": X, "lengths": lengths, "y": y}, y
+
+    def collate_input(self, X):
+        return self.__process_value(X, "src")
+
+    def collate_target(self, y):
+        return self.__process_value(y, "tgt").squeeze()
 
     def __getitem__(self, idx):
         item = self.__examples[idx]

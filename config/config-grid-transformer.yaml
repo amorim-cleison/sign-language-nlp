@@ -4,8 +4,8 @@ cuda: True
 seed: 1
 
 model: model.Transformer
-mode: train
-# mode: grid
+# mode: train
+mode: grid
 resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
 
@@ -44,7 +44,7 @@ training_args:
   #   patience: 20
   #   lower_is_better: False
   train_split:
-    cv: 0.1
+    cv: 0.1   # The proportion for validation
     stratified: False
   gradient_clipping:
     gradient_clip_value: 0.5
@@ -58,7 +58,9 @@ grid_args:
   verbose: 3
   scoring: accuracy
   n_jobs: 1
-  cv: 2
+  train_split:
+    cv: 0.22
+    stratified: True
   model_args:
     input_size: [64, 128, 256, 512]
     hidden_size: [128, 256, 512, 1024, 2048]

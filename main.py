@@ -48,16 +48,21 @@ def run(args):
     elif args["mode"] == "grid":
         run_grid_search(net=net,
                         callbacks_names=callbacks_names,
-                        dataset=dataset)
+                        dataset=dataset,
+                        **args)
 
 
-def run_grid_search(net, callbacks_names, dataset):
+def run_grid_search(net, callbacks_names, dataset, **kwargs):
     # Slice data (sklearn is not compatible with 'dataset'):
     X = SliceDataset(dataset, idx=0)
     y = SliceDataset(dataset, idx=1)
 
     # Grid search:
-    grid_params = h.build_grid_params(callbacks_names=callbacks_names, **args)
+    grid_params = h.build_grid_params(callbacks_names=callbacks_names,
+                                      net_train_split=net.train_split,
+                                      X=X,
+                                      y=dataset.collate_target(y),
+                                      **kwargs)
     gs = GridSearchCV(net, **grid_params)
     gs.fit(X, y)
 

@@ -39,20 +39,29 @@ training_args:
   max_epochs: 100 # Original: 100
   batch_size: 50
   lr: 0.50
-  early_stopping:
-    patience: 20
+  # early_stopping:
+  #   monitor: valid_acc
+  #   threshold: 0.0001
+  #   patience: 20
+  #   lower_is_better: False
+  train_split:
+    cv: 0.1   # The proportion for validation
+    stratified: False
   gradient_clipping:
     gradient_clip_value: 0.5
   lr_scheduler: 
     policy: ReduceLROnPlateau
     factor: 0.95
-    patience: 2
+    patience: 1
 
 
 grid_args:
   verbose: 3
   scoring: accuracy
   n_jobs: 1
+  train_split:
+    cv: 0.22
+    stratified: True
   model_args:
     input_size: [8, 64, 128, 256, 512]
     hidden_size: [4, 32, 125, 256, 512, 1024]
