@@ -4,8 +4,8 @@ cuda: True
 seed: 1
 
 model: model.Transformer
-# mode: train
-mode: grid
+mode: train
+# mode: grid
 resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
 
@@ -34,6 +34,7 @@ model_args:
 training_args:
   criterion: torch.nn.CrossEntropyLoss
   optimizer: torch.optim.SGD
+  verbose: 3
   max_epochs: 100 # Original: 100
   batch_size: 50
   lr: 0.50

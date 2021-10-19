@@ -35,6 +35,7 @@ model_args:
 training_args:
   criterion: torch.nn.CrossEntropyLoss
   optimizer: torch.optim.SGD
+  verbose: 3
   max_epochs: 100 # Original: 100
   batch_size: 50
   lr: 0.50
