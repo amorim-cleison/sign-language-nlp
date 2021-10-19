@@ -38,8 +38,11 @@ training_args:
   max_epochs: 100 # Original: 100
   batch_size: 50
   lr: 0.50
-  early_stopping:
-    patience: 20
+  # early_stopping:
+  #   monitor: valid_acc
+  #   threshold: 0.0001
+  #   patience: 20
+  #   lower_is_better: False
   gradient_clipping:
     gradient_clip_value: 0.5
   lr_scheduler: 

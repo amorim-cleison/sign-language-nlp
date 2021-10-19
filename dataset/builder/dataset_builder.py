@@ -76,7 +76,7 @@ class DatasetBuilder():
         n_samples = len(df)
         n_batches = n_samples / 10
         batches = np.array_split(df, n_batches)
-        msg = "Processing dataset... "
+        msg = "Processing data... "
 
         for batch in auto_log_progress(batches, message=msg):
             rows = batch["file"].apply(prepare_row)

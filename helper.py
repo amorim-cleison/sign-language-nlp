@@ -117,8 +117,14 @@ def build_grid_params(grid_args, dataset_args, callbacks_names, model, mode,
                   **grid_args)
 
 
-def build_callbacks(model, mode, workdir, resumable, early_stopping,
-                    gradient_clipping, lr_scheduler, **kwargs):
+def build_callbacks(model,
+                    mode,
+                    workdir,
+                    resumable,
+                    early_stopping=None,
+                    gradient_clipping=None,
+                    lr_scheduler=None,
+                    **kwargs):
     # Callbacks:
     callbacks = []
 
@@ -131,24 +137,28 @@ def build_callbacks(model, mode, workdir, resumable, early_stopping,
         callbacks.append(("resume_state", LoadInitState(checkpoint)))
 
     # Early stopping:
-    callbacks.append(("early_stopping", EarlyStopping(**early_stopping)))
+    if early_stopping:
+        callbacks.append(("early_stopping", EarlyStopping(**early_stopping)))
 
     # Gradient clip:
-    callbacks.append(
-        ("gradient_clipping", GradientNormClipping(**gradient_clipping)))
+    if gradient_clipping:
+        callbacks.append(
+            ("gradient_clipping", GradientNormClipping(**gradient_clipping)))
 
     # Progress bar (for epochs):
     callbacks.append(("progress_bar", ProgressBar()))
 
     # LR Scheduler:
-    def lr_score(net, X=None, y=None):
-        return net.optimizer_.param_groups[0]["lr"]
+    if lr_scheduler:
 
-    callbacks.append(("lr_scoring", EpochScoring(lr_score, name='lr')))
-    callbacks.append(("lr_scheduler",
-                      LRScheduler(monitor="valid_loss",
-                                  step_every="epoch",
-                                  **lr_scheduler)))
+        def lr_score(net, X=None, y=None):
+            return net.optimizer_.param_groups[0]["lr"]
+
+        callbacks.append(("lr_scoring", EpochScoring(lr_score, name='lr')))
+        callbacks.append(("lr_scheduler",
+                          LRScheduler(monitor="valid_loss",
+                                      step_every="epoch",
+                                      **lr_scheduler)))
 
     # Callbacks names:
     callbacks_names = [c[0] for c in callbacks]
