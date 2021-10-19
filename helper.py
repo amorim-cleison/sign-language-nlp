@@ -22,12 +22,12 @@ def prepare_device(cuda):
     return torch.device("cuda" if cuda else "cpu")
 
 
-def build_net_params(training_args, model_args, dataset_args, model, mode,
-                     resumable, callbacks, callbacks_names, device, dataset,
-                     **kwargs):
+def build_net_params(training_args, model_args, model, mode, resumable,
+                     callbacks, callbacks_names, device, dataset, **kwargs):
     # Configure params:
     training_args["criterion"] = locate(training_args["criterion"])
     training_args["optimizer"] = locate(training_args["optimizer"])
+    training_args["train_split"] = get_train_split(**training_args)
 
     # Callbacks args:
     callbacks_args = build_callbacks_args(model=model,
@@ -49,15 +49,10 @@ def build_net_params(training_args, model_args, dataset_args, model, mode,
                                 keys_to_filter=callbacks_names,
                                 not_in=True)
 
-    # CV split:
-    train_split = CVSplit(cv=dataset_args["samples_min_freq"],
-                          stratified=False)
-
     return {
         "device": device,
         "module": locate(model),
         "callbacks": callbacks,
-        "train_split": train_split,
         "iterator_train__collate_fn": dataset.collate_encoding,
         "iterator_valid__collate_fn": dataset.collate_encoding,
         **module_args,
@@ -66,17 +61,17 @@ def build_net_params(training_args, model_args, dataset_args, model, mode,
     }
 
 
-def build_grid_params(grid_args, dataset_args, callbacks_names, model, mode,
-                      workdir, **kwargs):
+def build_grid_params(grid_args, callbacks_names, model, mode, workdir,
+                      **kwargs):
     def unpack(training_args,
-               dataset_args,
                model_args,
                callbacks_names,
                model,
                workdir,
+               cv=None,
                mode="grid",
                scoring="accuracy",
-               n_jobs=1,
+               n_jobs=None,
                verbose=3,
                **kwargs):
         # Callbacks args:
@@ -97,7 +92,7 @@ def build_grid_params(grid_args, dataset_args, callbacks_names, model, mode,
 
         return {
             "refit": True,
-            "cv": dataset_args["samples_min_freq"],
+            "cv": cv,
             "verbose": verbose,
             "scoring": scoring,
             "n_jobs": n_jobs,
@@ -110,7 +105,6 @@ def build_grid_params(grid_args, dataset_args, callbacks_names, model, mode,
         }
 
     return unpack(callbacks_names=callbacks_names,
-                  dataset_args=dataset_args,
                   model=model,
                   mode=mode,
                   workdir=workdir,
@@ -121,15 +115,20 @@ def build_callbacks(model,
                     mode,
                     workdir,
                     resumable,
+                    train_split=None,
                     early_stopping=None,
                     gradient_clipping=None,
                     lr_scheduler=None,
                     **kwargs):
+    has_valid = train_split is not None
+
     # Callbacks:
     callbacks = []
 
     # Checkpoint saving:
-    checkpoint = Checkpoint(monitor='valid_loss_best', dirname=workdir)
+    checkpoint = Checkpoint(
+        monitor="valid_loss_best" if has_valid else "train_loss_best",
+        dirname=workdir)
     callbacks.append(("checkpoint", checkpoint))
 
     # Init state (resume):
@@ -155,10 +154,11 @@ def build_callbacks(model,
             return net.optimizer_.param_groups[0]["lr"]
 
         callbacks.append(("lr_scoring", EpochScoring(lr_score, name='lr')))
-        callbacks.append(("lr_scheduler",
-                          LRScheduler(monitor="valid_loss",
-                                      step_every="epoch",
-                                      **lr_scheduler)))
+        callbacks.append(
+            ("lr_scheduler",
+             LRScheduler(monitor="valid_loss" if has_valid else "train_loss",
+                         step_every="epoch",
+                         **lr_scheduler)))
 
     # Callbacks names:
     callbacks_names = [c[0] for c in callbacks]
@@ -186,6 +186,12 @@ def filter_by_keys(map, keys_to_filter, not_in=False):
 def get_processed(dataset, field):
     data = [getattr(x, field) for x in dataset]
     return dataset.fields[field].process(data)
+
+
+def get_train_split(train_split=None, **kwargs):
+    if train_split:
+        return CVSplit(**train_split)
+    return train_split
 
 
 def prefix_args(prefix, ensure_list=False, output=None, **kwargs):

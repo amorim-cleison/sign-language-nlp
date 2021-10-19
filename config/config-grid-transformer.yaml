@@ -43,18 +43,22 @@ training_args:
   #   threshold: 0.0001
   #   patience: 20
   #   lower_is_better: False
+  train_split:
+    cv: 0.1
+    stratified: False
   gradient_clipping:
     gradient_clip_value: 0.5
   lr_scheduler: 
     policy: ReduceLROnPlateau
     factor: 0.95
-    patience: 2
+    patience: 1
 
 
 grid_args:
   verbose: 3
   scoring: accuracy
   n_jobs: 1
+  cv: 2
   model_args:
     input_size: [64, 128, 256, 512]
     hidden_size: [128, 256, 512, 1024, 2048]

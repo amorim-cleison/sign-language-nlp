@@ -29,7 +29,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False"]
+            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "True"]
         }
     ]
 }
