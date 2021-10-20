@@ -81,15 +81,14 @@ class RNNModel(nn.Module):
                                         enforce_sorted=False)
 
         # Forward:
-        output, _hidden = self.rnn(output, hidden)
-
-        if len(_hidden) == 2:
-            (ht, ct) = _hidden
-            _hidden = ht
-
-        output = self.linear(_hidden[-1])
+        output = self._forward_rnn(output, hidden)
+        output = self.linear(output)
         # output = self.softmax(output, dim=-1)
         return output
+
+    def _forward_rnn(self, input, hidden):
+        output, hidden = self.rnn(input, hidden)
+        return hidden[-1]
 
     def init_hidden(self, batch_size):
         weight = next(self.parameters())

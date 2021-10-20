@@ -20,7 +20,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "False"]
+            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "True"]
         },
         {
             "name": "Grid - Transformer",
@@ -30,6 +30,15 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "True"]
+        },
+        {
+            "name": "Grid - GRU",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-grid-gru.yaml", "--cuda", "False", "--debug", "True"]
         }
     ]
 }

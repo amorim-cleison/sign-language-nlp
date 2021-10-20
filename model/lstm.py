@@ -21,6 +21,10 @@ class LSTM(RNNModel):
                        num_layers=num_layers,
                        batch_first=batch_first)
 
+    def _forward_rnn(self, input, hidden):
+        _output, (ht, ct) = self.rnn(input, hidden)
+        return ht[-1]
+
     def init_hidden(self, batch_size):
         weight = next(self.parameters())
         dims = (self.num_layers, batch_size, self.hidden_size)
