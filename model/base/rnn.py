@@ -81,9 +81,13 @@ class RNNModel(nn.Module):
                                         enforce_sorted=False)
 
         # Forward:
-        output, (ht, ct) = self.rnn(output, hidden)
+        output, _hidden = self.rnn(output, hidden)
 
-        output = self.linear(ht[-1])
+        if len(_hidden) == 2:
+            (ht, ct) = _hidden
+            _hidden = ht
+
+        output = self.linear(_hidden[-1])
         # output = self.softmax(output, dim=-1)
         return output
 
