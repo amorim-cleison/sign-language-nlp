@@ -22,28 +22,45 @@ def prepare_device(cuda):
     return torch.device("cuda" if cuda else "cpu")
 
 
-def build_net_params(training_args, model_args, model, mode, resumable,
-                     callbacks, callbacks_names, device, dataset, **kwargs):
+def build_net_params(training_args, model_args, model, optimizer, criterion,
+                     mode, resumable, callbacks, callbacks_names, device,
+                     dataset, optimizer_args, criterion_args, **kwargs):
     # Configure params:
-    training_args["criterion"] = locate(training_args["criterion"])
-    training_args["optimizer"] = locate(training_args["optimizer"])
     training_args["train_split"] = get_train_split(**training_args)
 
     # Callbacks args:
-    callbacks_args = build_callbacks_args(model=model,
-                                          mode=mode,
-                                          callbacks_names=callbacks_names,
-                                          **training_args,
-                                          **kwargs)
+    _callbacks_args = build_callbacks_args(model=model,
+                                           mode=mode,
+                                           callbacks_names=callbacks_names,
+                                           **training_args,
+                                           **kwargs)
 
     # Module args:
-    module_args = prefix_args("module",
-                              ensure_list=False,
-                              batch_first=dataset.batch_first,
-                              src_vocab=dataset.src_vocab,
-                              tgt_vocab=dataset.tgt_vocab,
-                              **model_args)
+    _module_args = prefix_args("module",
+                               ensure_list=False,
+                               batch_first=dataset.batch_first,
+                               src_vocab=dataset.src_vocab,
+                               tgt_vocab=dataset.tgt_vocab,
+                               **model_args)
 
+    # Module args:
+    _optimizer_args = prefix_args("optimizer",
+                                  ensure_list=False,
+                                  **optimizer_args)
+
+    # Criterion args:
+    _criterion_args = prefix_args("criterion",
+                                  ensure_list=False,
+                                  **criterion_args)
+
+    # Iterators args:
+    iterators_args = {"collate_fn": dataset.collate}
+    _iterator_train_args = prefix_args("iterator_train",
+                                       ensure_list=False,
+                                       **iterators_args)
+    _iterator_valid_args = prefix_args("iterator_valid",
+                                       ensure_list=False,
+                                       **iterators_args)
     # Other args:
     other_args = filter_by_keys(training_args,
                                 keys_to_filter=callbacks_names,
@@ -52,11 +69,15 @@ def build_net_params(training_args, model_args, model, mode, resumable,
     return {
         "device": device,
         "module": locate(model),
+        "optimizer": locate(optimizer),
+        "criterion": locate(criterion),
         "callbacks": callbacks,
-        "iterator_train__collate_fn": dataset.collate,
-        "iterator_valid__collate_fn": dataset.collate,
-        **module_args,
-        **callbacks_args,
+        **_module_args,
+        **_optimizer_args,
+        **_criterion_args,
+        **_callbacks_args,
+        **_iterator_train_args,
+        **_iterator_valid_args,
         **other_args
     }
 
@@ -64,7 +85,6 @@ def build_net_params(training_args, model_args, model, mode, resumable,
 def build_grid_params(grid_args, net_train_split, X, y, callbacks_names, model,
                       mode, workdir, **kwargs):
     def unpack(training_args,
-               model_args,
                callbacks_names,
                model,
                workdir,
@@ -75,17 +95,30 @@ def build_grid_params(grid_args, net_train_split, X, y, callbacks_names, model,
                scoring="accuracy",
                n_jobs=None,
                verbose=3,
+               model_args={},
+               optimizer_args={},
+               criterion_args={},
                **kwargs):
         # Callbacks args:
-        callbacks_args = build_callbacks_args(model=model,
-                                              mode=mode,
-                                              workdir=workdir,
-                                              callbacks_names=callbacks_names,
-                                              ensure_list=True,
-                                              **training_args)
+        _callbacks_args = build_callbacks_args(model=model,
+                                               mode=mode,
+                                               workdir=workdir,
+                                               callbacks_names=callbacks_names,
+                                               ensure_list=True,
+                                               **training_args)
 
         # Module args:
-        module_args = prefix_args("module", ensure_list=True, **model_args)
+        _module_args = prefix_args("module", ensure_list=True, **model_args)
+
+        # Optimizer args:
+        _optimizer_args = prefix_args("optimizer",
+                                      ensure_list=True,
+                                      **optimizer_args)
+
+        # Criterion args:
+        _criterion_args = prefix_args("criterion",
+                                      ensure_list=True,
+                                      **criterion_args)
 
         # Other args:
         other_args = filter_by_keys(training_args,
@@ -111,8 +144,10 @@ def build_grid_params(grid_args, net_train_split, X, y, callbacks_names, model,
             "n_jobs": n_jobs,
             "error_score": "raise",
             "param_grid": {
-                **module_args,
-                **callbacks_args,
+                **_module_args,
+                **_optimizer_args,
+                **_criterion_args,
+                **_callbacks_args,
                 **other_args
             }
         }

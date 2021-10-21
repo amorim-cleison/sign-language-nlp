@@ -2,12 +2,13 @@ debug: False
 log: Null
 cuda: True
 seed: 1
-
-model: model.LSTM
-# mode: train
 mode: grid
 resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
+
+model: model.LSTM
+criterion: torch.nn.CrossEntropyLoss
+optimizer: torch.optim.SGD
 
 dataset_args:
   dataset_dir: ../../work/dataset/asl-phono/phonology/3d
@@ -28,13 +29,8 @@ model_args:
   hidden_size: 2048
   num_layers: 6
   dropout: 0.1
-  # Transformer:
-  # num_heads: 8
-
 
 training_args:
-  criterion: torch.nn.CrossEntropyLoss
-  optimizer: torch.optim.SGD
   verbose: 3
   max_epochs: 100 # Original: 100
   batch_size: 50
@@ -53,7 +49,6 @@ training_args:
     policy: ReduceLROnPlateau
     factor: 0.95
     patience: 1
-
 
 grid_args:
   verbose: 3

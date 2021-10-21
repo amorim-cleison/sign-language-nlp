@@ -2,12 +2,13 @@ debug: False
 log: Null
 cuda: True
 seed: 1
-
-model: model.Transformer
-# mode: train
 mode: grid
 resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
+
+model: model.Transformer
+optimizer: torch.optim.Adam
+criterion: torch.nn.CrossEntropyLoss
 
 dataset_args:
   dataset_dir: ../../work/dataset/asl-phono/phonology/3d
@@ -30,10 +31,12 @@ model_args:
   dropout: 0.1
   num_heads: 8
 
+optimizer_args:
+  # nesterov: False
+  betas: [0.9, 0.98]
+  eps: 10e-9 
 
 training_args:
-  criterion: torch.nn.CrossEntropyLoss
-  optimizer: torch.optim.SGD
   verbose: 3
   max_epochs: 100 # Original: 100
   batch_size: 50
@@ -52,7 +55,6 @@ training_args:
     policy: ReduceLROnPlateau
     factor: 0.95
     patience: 1
-
 
 grid_args:
   verbose: 3

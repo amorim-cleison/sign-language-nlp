@@ -11,7 +11,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-lstm.yaml"]
+            "args": ["-c", "config/config-grid-lstm.yaml", "--debug", "False"]
         },
         {
             "name": "Grid - LSTM",
@@ -20,7 +20,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "True"]
+            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "False","--mode", "grid"]
         },
         {
             "name": "Grid - Transformer",
@@ -29,7 +29,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "True"]
+            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--mode", "grid"]
         },
         {
             "name": "Grid - GRU",
@@ -38,7 +38,16 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-gru.yaml", "--cuda", "False", "--debug", "True"]
-        }
+            "args": ["-c", "config/config-grid-gru.yaml", "--cuda", "False", "--debug", "False", "--mode", "grid"]
+        },
+        {
+            "name": "Train - Transformer",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--mode", "train"]
+        },
     ]
 }

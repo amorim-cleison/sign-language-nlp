@@ -2,12 +2,13 @@ debug: False
 log: Null
 cuda: True
 seed: 1
-
-model: model.GRU
-# mode: train
 mode: grid
 resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
+
+model: model.GRU
+criterion: torch.nn.CrossEntropyLoss
+optimizer: torch.optim.SGD
 
 dataset_args:
   dataset_dir: ../../work/dataset/asl-phono/phonology/3d
@@ -33,8 +34,6 @@ model_args:
 
 
 training_args:
-  criterion: torch.nn.CrossEntropyLoss
-  optimizer: torch.optim.SGD
   verbose: 3
   max_epochs: 100 # Original: 100
   batch_size: 50
