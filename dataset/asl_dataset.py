@@ -1,6 +1,7 @@
 from torch.utils.data import Dataset
 
 from dataset.builder import DatasetBuilder
+import torch
 
 
 class AslDataset(Dataset):
@@ -61,4 +62,17 @@ class AslDataset(Dataset):
 
     def __process_value(self, values, field_name):
         field = self.__fields[field_name]
+        values = self.__fix_types(values)
         return field.process(values, device=self.__device)
+
+    def __fix_types(self, values):
+        def fix_type(x):
+            if type(x) is list:
+                pass
+            elif torch.is_tensor(x):
+                if (x.ndim < 1):
+                    x = x.unsqueeze(-1)
+                x = x.numpy()
+            return x
+
+        return (fix_type(x) for x in values)

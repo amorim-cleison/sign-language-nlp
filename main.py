@@ -61,7 +61,7 @@ def run_grid_search(net, callbacks_names, dataset, **kwargs):
     grid_params = h.build_grid_params(callbacks_names=callbacks_names,
                                       net_train_split=net.train_split,
                                       X=X,
-                                      y=dataset.collate_target(y),
+                                      y=y,
                                       **kwargs)
     gs = GridSearchCV(net, **grid_params)
     gs.fit(X, y)
@@ -71,7 +71,7 @@ def run_grid_search(net, callbacks_names, dataset, **kwargs):
         "best_score": float(gs.best_score_),
         "best_params": gs.best_params_,
         "best_index": int(gs.best_index_),
-        "scoring": gs.scoring
+        "scoring": str(gs.scoring)
     }
     print(gs_output)
 

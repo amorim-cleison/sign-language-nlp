@@ -133,14 +133,17 @@ def build_grid_params(grid_args, net_train_split, X, y, callbacks_names, model,
         else:
             train_split = get_train_split(**grid_args)
 
-        train, valid = train_split(X, y)
+        train, valid = train_split(X, get_collated_y(y))
         cv = [(train.indices, valid.indices)]
+
+        # Scoring:
+        _scoring = ScoringWrapper(scoring)
 
         return {
             "refit": True,
             "cv": cv,
             "verbose": verbose,
-            "scoring": scoring,
+            "scoring": _scoring,
             "n_jobs": n_jobs,
             "error_score": "raise",
             "param_grid": {
@@ -225,6 +228,14 @@ def build_callbacks_args(callbacks_names,
     return prefix_args("callbacks", ensure_list=ensure_list, **callbacks_args)
 
 
+def get_collated_y(y):
+    from skorch.helper import SliceDataset
+
+    if type(y) is SliceDataset:
+        y = y.dataset.collate_target(y).numpy()
+    return y
+
+
 def format_dir(dir, **kwargs):
     return normpath(dir.format(**kwargs)) if dir is not None else ''
 
@@ -262,3 +273,17 @@ def prefix_args(prefix, ensure_list=False, output=None, **kwargs):
                 v = [v]
             output[name] = v
     return output
+
+
+class ScoringWrapper:
+    def __init__(self, score_func):
+        from sklearn.metrics import get_scorer
+        self._score_func = score_func
+        self.scorer = get_scorer(score_func)
+
+    def __call__(self, estimator, X, y_true, sample_weight=None):
+        y_true = get_collated_y(y_true)
+        return self.scorer(estimator, X, y_true, sample_weight)
+
+    def __repr__(self):
+        return f"{type(self).__name__}('{self._score_func}')"
