@@ -232,7 +232,7 @@ def get_collated_y(y):
     from skorch.helper import SliceDataset
 
     if type(y) is SliceDataset:
-        y = y.dataset.collate_target(y).numpy()
+        y = y.dataset.collate_target(y).cpu().numpy()
     return y
 
 
