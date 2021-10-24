@@ -199,7 +199,7 @@ def build_callbacks(model,
             ("gradient_clipping", GradientNormClipping(**gradient_clipping)))
 
     # Progress bar (for epochs):
-    callbacks.append(("progress_bar", ProgressBar()))
+    # callbacks.append(("progress_bar", ProgressBar()))
 
     # LR Scheduler:
     if lr_scheduler:

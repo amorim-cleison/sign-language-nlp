@@ -66,8 +66,8 @@ grid_args:
   scoring: accuracy
   n_jobs: 1
   train_split:
-    cv: 0.15
-    stratified: False
+    cv: 0.25
+    stratified: True
   model_args:
     input_size: [64, 128, 256, 512]
     hidden_size: [128, 256, 512, 1024, 2048]
