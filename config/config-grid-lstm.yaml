@@ -7,8 +7,9 @@ resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
 
 model: model.LSTM
-criterion: torch.nn.CrossEntropyLoss
+# optimizer: torch.optim.Adam
 optimizer: torch.optim.SGD
+criterion: torch.nn.CrossEntropyLoss
 
 dataset_args:
   dataset_dir: ../../work/dataset/asl-phono/phonology/3d
@@ -30,16 +31,22 @@ model_args:
   num_layers: 6
   dropout: 0.1
 
+optimizer_args:
+  # SGD ---
+  nesterov: False
+  # momentum: 0
+  # dampening: 0
+  # weight_decay: 0
+
 training_args:
   verbose: 3
   max_epochs: 100 # Original: 100
   batch_size: 50
   lr: 0.50
-  # early_stopping:
-  #   monitor: valid_acc
-  #   threshold: 0.0001
-  #   patience: 20
-  #   lower_is_better: False
+  early_stopping:
+    monitor: valid_loss
+    patience: 50
+    lower_is_better: True
   train_split:
     cv: 0.1   # The proportion for validation
     stratified: False
@@ -61,7 +68,7 @@ grid_args:
     input_size: [16, 64, 128, 512]
     hidden_size: [32, 256, 1024]
     num_layers: [2, 6, 10]
-    dropout: [0.0, 0.1, 0.2, 0.3]
+    dropout: [0.0, 0.1, 0.3]
   training_args:
-    lr: [0.1, 0.01, 0.05, 0.001]
+    lr: [0.1, 0.01, 0.001]
     

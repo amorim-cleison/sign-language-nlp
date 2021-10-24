@@ -7,7 +7,8 @@ resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
 
 model: model.Transformer
-optimizer: torch.optim.Adam
+# optimizer: torch.optim.Adam
+optimizer: torch.optim.SGD
 criterion: torch.nn.CrossEntropyLoss
 
 dataset_args:
@@ -32,20 +33,24 @@ model_args:
   num_heads: 8
 
 optimizer_args:
-  # nesterov: False
-  betas: [0.9, 0.98]
-  eps: 10e-9 
+  # SGD ---
+  nesterov: False
+  # momentum: 0
+  # dampening: 0
+  # weight_decay: 0
+  # ADAM ---
+  # betas: [0.9, 0.98]
+  # eps: 10e-9 
 
 training_args:
   verbose: 3
   max_epochs: 100 # Original: 100
   batch_size: 50
   lr: 0.50
-  # early_stopping:
-  #   monitor: valid_acc
-  #   threshold: 0.0001
-  #   patience: 20
-  #   lower_is_better: False
+  early_stopping:
+    monitor: valid_loss
+    patience: 50
+    lower_is_better: True
   train_split:
     cv: 0.1   # The proportion for validation
     stratified: False
@@ -67,8 +72,8 @@ grid_args:
     input_size: [64, 128, 256, 512]
     hidden_size: [128, 256, 512, 1024, 2048]
     num_layers: [2, 6, 10]
-    dropout: [0.0, 0.1, 0.2, 0.3]
+    dropout: [0.0, 0.1, 0.3]
     num_heads: [2, 4, 8, 16]
   training_args:
-    lr: [0.1, 0.01, 0.05, 0.001]
+    lr: [0.1, 0.01, 0.001]
     
