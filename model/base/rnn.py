@@ -76,7 +76,7 @@ class RNNModel(nn.Module):
 
         # Pack:
         output = t.pack_padded_sequence(input=output,
-                                        lengths=lengths,
+                                        lengths=lengths.cpu(),
                                         batch_first=self.batch_first,
                                         enforce_sorted=False)
 
