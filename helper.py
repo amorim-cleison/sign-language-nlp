@@ -54,7 +54,11 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
                                   **criterion_args)
 
     # Iterators args:
-    iterators_args = {"collate_fn": dataset.collate}
+    iterators_args = {
+        "collate_fn": dataset.collate,
+        # "num_workers": 4,
+        # "shuffle": True
+    }
     _iterator_train_args = prefix_args("iterator_train",
                                        ensure_list=False,
                                        **iterators_args)
@@ -228,11 +232,22 @@ def build_callbacks_args(callbacks_names,
     return prefix_args("callbacks", ensure_list=ensure_list, **callbacks_args)
 
 
-def get_collated_y(y):
-    from skorch.helper import SliceDataset
+def __unpack_dataset(ds):
+    from dataset import AslDataset
 
-    if type(y) is SliceDataset:
-        y = y.dataset.collate_target(y).cpu().numpy()
+    if isinstance(ds, AslDataset):
+        return ds
+    elif hasattr(ds, 'dataset'):
+        return __unpack_dataset(ds.dataset)
+    else:
+        return None
+
+
+def get_collated_y(y):
+    ds = __unpack_dataset(y)
+
+    if ds is not None:
+        y = ds.collate_target(y).cpu().numpy()
     return y
 
 

@@ -1,13 +1,16 @@
 import pandas as pd
 from commons.log import log
 from commons.util import load_args, save_json
-from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import get_scorer
+from sklearn.model_selection import GridSearchCV, cross_val_score
 from skorch import NeuralNetClassifier
 from skorch.helper import SliceDataset
+from torch.utils.data import random_split
 
 import helper as h
 from args import ARGUMENTS
 from dataset import AslDataset
+from helper import ScoringWrapper
 
 
 def run(args):
@@ -42,7 +45,8 @@ def run(args):
 
     # Train:
     if args["mode"] == "train":
-        net.fit(dataset, None)
+        cv = net.train_split.cv
+        run_training(net=net, dataset=dataset, scoring="accuracy", cv=cv)
 
     # Grid search:
     elif args["mode"] == "grid":
@@ -50,6 +54,50 @@ def run(args):
                         callbacks_names=callbacks_names,
                         dataset=dataset,
                         **args)
+
+
+def run_training(net, dataset, cv, scoring, **kwargs):
+    if isinstance(cv, float):
+        run_training_no_cv(net, dataset, cv, scoring)
+    elif isinstance(cv, int):
+        run_training_cv(net, dataset, cv, scoring)
+    else:
+        raise Exception("Unknown `cv` format.")
+
+
+def run_training_no_cv(net, dataset, cv, scoring):
+    assert (isinstance(cv, float)), "Invalid `cv` value"
+    _scorer = get_scorer(scoring)
+
+    # Data split:
+    _len = len(dataset)
+    test_len = int(cv * _len)
+    train_len = int(_len - test_len)
+    train_ds, test_ds = random_split(dataset, [train_len, test_len])
+
+    # Fit:
+    net.fit(train_ds, None)
+
+    # Scoring:
+    y_test = dataset.collate_target(SliceDataset(test_ds, idx=1))
+    score = _scorer(net, test_ds, y_test)
+    print(f"Test accuracy: {score:.3f}")
+
+
+def run_training_cv(net, dataset, cv, scoring):
+    assert (isinstance(cv, int)), "Invalid `cv` value"
+
+    X_train = SliceDataset(dataset, idx=0)
+    y_train = SliceDataset(dataset, idx=1)
+
+    scores = cross_val_score(net,
+                             X_train,
+                             y_train,
+                             cv=cv,
+                             scoring=ScoringWrapper(scoring),
+                             error_score='raise')
+    print(f"{scoring.capitalize()} per fold: {[f'{x:.3f}' for x in scores]}]")
+    print(f"Avg validation {scoring}: {scores.mean():.3f}")
 
 
 def run_grid_search(net, callbacks_names, dataset, **kwargs):

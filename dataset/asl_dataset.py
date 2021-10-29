@@ -51,7 +51,7 @@ class AslDataset(Dataset):
         return self.__process_value(X, "src")
 
     def collate_target(self, y):
-        return self.__process_value(y, "tgt").squeeze()
+        return self.__process_value(y, "tgt").squeeze(-1)
 
     def __getitem__(self, idx):
         item = self.__examples[idx]

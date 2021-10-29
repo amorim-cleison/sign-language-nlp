@@ -60,8 +60,8 @@ class Transformer(nn.Module):
         assert (X is not None), "`X` is a required paramenter"
         assert (y is not None), "`y` is a required paramenter"
 
-        src = self.adjust_batch(X)
-        tgt = self.adjust_batch(y.unsqueeze(dim=-1))
+        src = self.adjust_batch_in(X)
+        tgt = self.adjust_batch_in(y)
 
         # Masks:
         src_mask = generate_mask(src).to(self.device)
@@ -86,15 +86,35 @@ class Transformer(nn.Module):
                                   tgt_key_padding_mask=tgt_padding_mask)
         output = self.linear(output)
         output = self.softmax(output, dim=-1)
-        return self.adjust_batch(output).squeeze()
+        return self.adjust_batch_out(output)
 
-    def adjust_batch(self, data):
+    def adjust_batch_in(self, data):
         """Transformer requires to be in the shape `(S,N,E)` where `S` is the
         sequence length, `N` batch size, and `E` is the feature number."""
-        if (self.batch_first and data.ndim > 1):
-            return data.transpose(0, 1)
-        else:
+        # data = self.__fix_dims(data, 2)
+
+        if data.ndim < 2:
+            data = data.unsqueeze(-1)
+        if self.batch_first:
+            data = data.transpose(1, 0)
+        return data
+
+    def adjust_batch_out(self, data):
+        if data.ndim > 2:
+            data = data.squeeze(dim=0)
+        # data = self.__fix_dims(data, 2)
+        return data
+
+    def __fix_dims(self, data, tgt_dims):
+        _dim = 0 if self.batch_first else 1
+
+        if data.ndim == tgt_dims:
             return data
+        elif data.ndim < tgt_dims:
+            _dim = 0 if self.batch_first else 1
+            return self.__fix_dims(data.unsqueeze(_dim), tgt_dims)
+        elif data.ndim > tgt_dims:
+            return self.__fix_dims(data.squeeze(), tgt_dims)
 
     def forward_embedding(self, x, embedding, pos_encoding):
         x = embedding(x) * math.sqrt(self.input_size)

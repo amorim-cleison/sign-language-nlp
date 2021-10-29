@@ -46,7 +46,9 @@ def generate_padding_mask(data, vocab):
     pad_idx = get_pad_idx(vocab)
     mask = (data == pad_idx).bool()
 
-    if mask.ndim >= 2:
+    if mask.ndim < 2:
+        mask = mask.unsqueeze(-1)
+    elif mask.ndim >= 2:
         mask = mask.transpose(0, 1)
     return mask
 
