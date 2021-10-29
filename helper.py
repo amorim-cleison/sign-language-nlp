@@ -195,7 +195,10 @@ def build_callbacks(model,
 
     # Early stopping:
     if early_stopping:
-        callbacks.append(("early_stopping", EarlyStopping(**early_stopping)))
+        callbacks.append(("early_stopping",
+                          EarlyStopping(**early_stopping,
+                                        monitor="valid_loss"
+                                        if has_valid else "train_loss")))
 
     # Gradient clip:
     if gradient_clipping:

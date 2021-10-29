@@ -80,7 +80,7 @@ def run_training_no_cv(net, dataset, cv, scoring):
 
     # Scoring:
     y_test = dataset.collate_target(SliceDataset(test_ds, idx=1))
-    score = _scorer(net, test_ds, y_test)
+    score = _scorer(net, test_ds, y_test.cpu())
     print(f"Test accuracy: {score:.3f}")
 
 
