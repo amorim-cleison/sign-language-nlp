@@ -2,7 +2,7 @@ import pandas as pd
 from commons.log import log
 from commons.util import load_args, save_json
 from sklearn.metrics import get_scorer
-from sklearn.model_selection import GridSearchCV, cross_val_score
+from sklearn.model_selection import GridSearchCV, cross_val_score, StratifiedShuffleSplit
 from skorch import NeuralNetClassifier
 from skorch.helper import SliceDataset
 from torch.utils.data import random_split
@@ -46,7 +46,10 @@ def run(args):
     # Train:
     if args["mode"] == "train":
         cv = net.train_split.cv
-        run_training(net=net, dataset=dataset, scoring="accuracy", cv=cv)
+        run_training(net=net,
+                     dataset=dataset,
+                     scoring="balanced_accuracy",   # FIXME: externalize scoring for training
+                     cv=cv)
 
     # Grid search:
     elif args["mode"] == "grid":
@@ -74,12 +77,12 @@ def run_training_no_cv(net, dataset, cv, scoring):
     test_len = int(cv * _len)
     train_len = int(_len - test_len)
     train_ds, test_ds = random_split(dataset, [train_len, test_len])
+    y_test = dataset.collate_target(SliceDataset(test_ds, idx=1))
 
     # Fit:
     net.fit(train_ds, None)
 
     # Scoring:
-    y_test = dataset.collate_target(SliceDataset(test_ds, idx=1))
     score = _scorer(net, test_ds, y_test.cpu())
     print(f"Test accuracy: {score:.3f}")
 
@@ -90,12 +93,31 @@ def run_training_cv(net, dataset, cv, scoring):
     X_train = SliceDataset(dataset, idx=0)
     y_train = SliceDataset(dataset, idx=1)
 
+    from sklearn.model_selection import StratifiedShuffleSplit
+    # https://scikit-learn.org/stable/modules/cross_validation.html
+
+    # TODO: deal with imbalanced dataset
+    # TODO: test with StratifiedShuffleSplit (https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.StratifiedShuffleSplit.html#sklearn.model_selection.StratifiedShuffleSplit)
+    # TODO: use the balanced_accuracy metric (https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html#sklearn.metrics.balanced_accuracy_score)
+
+    # OPTION 1: standard cv
+    # scores = cross_val_score(net,
+    #                          X_train,
+    #                          y_train,
+    #                          cv=cv,
+    #                          scoring=ScoringWrapper(scoring),
+    #                          error_score='raise')
+
+    # OPTION 2: StratifiedShuffleSplit
     scores = cross_val_score(net,
                              X_train,
                              y_train,
-                             cv=cv,
+                             cv=StratifiedShuffleSplit(n_splits=cv,
+                                                       test_size=0.1,
+                                                       random_state=0),
                              scoring=ScoringWrapper(scoring),
-                             error_score='raise')
+                             error_score='raise')  # FIXME: refactor this
+
     print(f"{scoring.capitalize()} per fold: {[f'{x:.3f}' for x in scores]}]")
     print(f"Avg validation {scoring}: {scores.mean():.3f}")
 
