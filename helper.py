@@ -1,16 +1,20 @@
+import random
 from pydoc import locate
 
+import numpy as np
 import torch
 from commons.log import log
 from commons.util import normpath
+from sklearn.model_selection import *
 from skorch.callbacks import (Checkpoint, EarlyStopping, EpochScoring,
-                              GradientNormClipping, LoadInitState, LRScheduler,
-                              ProgressBar)
+                              GradientNormClipping, LoadInitState, LRScheduler)
 from skorch.dataset import CVSplit
 
 
 def setup_seed(seed, **kwargs):
     torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
 
 
 def prepare_device(cuda):
@@ -24,9 +28,10 @@ def prepare_device(cuda):
 
 def build_net_params(training_args, model_args, model, optimizer, criterion,
                      mode, resumable, callbacks, callbacks_names, device,
-                     dataset, optimizer_args, criterion_args, **kwargs):
+                     dataset, optimizer_args, criterion_args, cross_validator,
+                     **kwargs):
     # Configure params:
-    training_args["train_split"] = get_train_split(**training_args)
+    train_split = cross_validator if is_cv_for_net(cross_validator) else None
 
     # Callbacks args:
     _callbacks_args = build_callbacks_args(model=model,
@@ -66,9 +71,11 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
                                        ensure_list=False,
                                        **iterators_args)
     # Other args:
-    other_args = filter_by_keys(training_args,
-                                keys_to_filter=callbacks_names,
-                                not_in=True)
+    KEYS_FOR_NET = [
+        "lr", "max_epochs", "batch_size", "predict_nonlinearity", "warm_start",
+        "verbose"
+    ]
+    _net_args = filter_by_keys(training_args, keys_to_filter=KEYS_FOR_NET)
 
     return {
         "device": device,
@@ -76,36 +83,35 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
         "optimizer": locate(optimizer),
         "criterion": locate(criterion),
         "callbacks": callbacks,
+        "train_split": train_split,
+        **_net_args,
         **_module_args,
         **_optimizer_args,
         **_criterion_args,
         **_callbacks_args,
         **_iterator_train_args,
-        **_iterator_valid_args,
-        **other_args
+        **_iterator_valid_args
     }
 
 
-def build_grid_params(grid_args, net_train_split, X, y, callbacks_names, model,
-                      mode, workdir, **kwargs):
+def build_grid_params(grid_args, X, y, callbacks_names, model, workdir,
+                      scoring, cross_validator, verbose, **kwargs):
     def unpack(training_args,
                callbacks_names,
                model,
                workdir,
                X,
                y,
-               net_train_split=None,
-               mode="grid",
-               scoring="accuracy",
-               n_jobs=None,
-               verbose=3,
+               cross_validator,
+               scoring,
+               verbose,
                model_args={},
                optimizer_args={},
                criterion_args={},
                **kwargs):
         # Callbacks args:
         _callbacks_args = build_callbacks_args(model=model,
-                                               mode=mode,
+                                               mode="grid",
                                                workdir=workdir,
                                                callbacks_names=callbacks_names,
                                                ensure_list=True,
@@ -125,45 +131,34 @@ def build_grid_params(grid_args, net_train_split, X, y, callbacks_names, model,
                                       **criterion_args)
 
         # Other args:
-        other_args = filter_by_keys(training_args,
-                                    keys_to_filter=callbacks_names,
-                                    not_in=True)
-
-        # CV:
-        if ("train_split" in grid_args):
-            train_split = get_train_split(**grid_args)
-        elif net_train_split:
-            train_split = net_train_split
-        else:
-            train_split = get_train_split(**grid_args)
-
-        train, valid = train_split(X, get_collated_y(y))
-        cv = [(train.indices, valid.indices)]
+        KEYS_FOR_GRID = [
+            "n_jobs", "refit", "verbose", "pre_dispatch", "return_train_score"
+        ]
+        _grid_args = filter_by_keys(kwargs, keys_to_filter=KEYS_FOR_GRID)
 
         # Scoring:
         _scoring = ScoringWrapper(scoring)
 
         return {
             "refit": True,
-            "cv": cv,
+            "cv": cross_validator,
             "verbose": verbose,
             "scoring": _scoring,
-            "n_jobs": n_jobs,
             "error_score": "raise",
-            "param_grid": {
+            **_grid_args, "param_grid": {
                 **_module_args,
                 **_optimizer_args,
                 **_criterion_args,
-                **_callbacks_args,
-                **other_args
+                **_callbacks_args
             }
         }
 
     return unpack(callbacks_names=callbacks_names,
                   model=model,
-                  mode=mode,
                   workdir=workdir,
-                  net_train_split=net_train_split,
+                  cross_validator=cross_validator,
+                  scoring=scoring,
+                  verbose=verbose,
                   X=X,
                   y=y,
                   **grid_args)
@@ -173,20 +168,25 @@ def build_callbacks(model,
                     mode,
                     workdir,
                     resumable,
-                    train_split=None,
+                    scoring,
                     early_stopping=None,
                     gradient_clipping=None,
                     lr_scheduler=None,
+                    cv=None,
+                    cv_args=None,
                     **kwargs):
-    has_valid = train_split is not None
+    # Cross-validator:
+    cross_validator = get_cross_validator(cv=cv, cv_args=cv_args)
+    has_valid = is_cv_for_net(cross_validator)
+    monitor = "valid" if has_valid else "train"
 
     # Callbacks:
     callbacks = []
 
+    # FIXME: add callback for scoring during training
+
     # Checkpoint saving:
-    checkpoint = Checkpoint(
-        monitor="valid_loss_best" if has_valid else "train_loss_best",
-        dirname=workdir)
+    checkpoint = Checkpoint(monitor=f"{monitor}_loss_best", dirname=workdir)
     callbacks.append(("checkpoint", checkpoint))
 
     # Init state (resume):
@@ -197,29 +197,38 @@ def build_callbacks(model,
     if early_stopping:
         callbacks.append(("early_stopping",
                           EarlyStopping(**early_stopping,
-                                        monitor="valid_loss"
-                                        if has_valid else "train_loss")))
+                                        monitor=f"{monitor}_loss")))
 
     # Gradient clip:
     if gradient_clipping:
         callbacks.append(
             ("gradient_clipping", GradientNormClipping(**gradient_clipping)))
 
-    # Progress bar (for epochs):
-    # callbacks.append(("progress_bar", ProgressBar()))
+    # LR Scoring:
+    def lr_score(net, X, y=None):
+        return net.optimizer_.param_groups[0]["lr"]
+
+    callbacks.append(("lr_scoring",
+                      EpochScoring(scoring=lr_score,
+                                   name='lr',
+                                   on_train=not has_valid)))
 
     # LR Scheduler:
     if lr_scheduler:
+        callbacks.append(("lr_scheduler",
+                          LRScheduler(monitor=f"{monitor}_loss",
+                                      step_every="epoch",
+                                      **lr_scheduler)))
 
-        def lr_score(net, X=None, y=None):
-            return net.optimizer_.param_groups[0]["lr"]
+    # Scoring metric (dynamic):
+    _score = ScoringWrapper(scoring)
 
-        callbacks.append(("lr_scoring", EpochScoring(lr_score, name='lr')))
-        callbacks.append(
-            ("lr_scheduler",
-             LRScheduler(monitor="valid_loss" if has_valid else "train_loss",
-                         step_every="epoch",
-                         **lr_scheduler)))
+    callbacks.append(
+        ("score",
+         EpochScoring(scoring=_score,
+                      name=scoring,
+                      on_train=True,
+                      lower_is_better=not _score.greater_is_better)))
 
     # Callbacks names:
     callbacks_names = [c[0] for c in callbacks]
@@ -268,10 +277,13 @@ def get_processed(dataset, field):
     return dataset.fields[field].process(data)
 
 
-def get_train_split(train_split=None, **kwargs):
-    if train_split:
-        return CVSplit(**train_split)
-    return train_split
+def get_cross_validator(cv, cv_args, **kwargs):
+    _cv = locate(cv)
+    return _cv(**cv_args)
+
+
+def is_cv_for_net(cross_validator):
+    return isinstance(cross_validator, (int, float, CVSplit))
 
 
 def prefix_args(prefix, ensure_list=False, output=None, **kwargs):
@@ -305,3 +317,7 @@ class ScoringWrapper:
 
     def __repr__(self):
         return f"{type(self).__name__}('{self._score_func}')"
+
+    @property
+    def greater_is_better(self):
+        return (self.scorer._sign == 1)

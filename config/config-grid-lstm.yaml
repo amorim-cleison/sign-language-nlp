@@ -5,11 +5,14 @@ seed: 1
 mode: grid
 resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
+scoring: balanced_accuracy
+verbose: 3
 
 model: model.LSTM
 # optimizer: torch.optim.Adam
 optimizer: torch.optim.SGD
 criterion: torch.nn.CrossEntropyLoss
+cv: sklearn.model_selection.StratifiedShuffleSplit
 
 dataset_args:
   dataset_dir: ../../work/dataset/asl-phono/phonology/3d
@@ -38,17 +41,18 @@ optimizer_args:
   # dampening: 0
   # weight_decay: 0
 
+cv_args:
+  n_splits: 3
+  test_size: 0.2
+  random_state: 1
+
 training_args:
-  verbose: 3
   max_epochs: 100 # Original: 100
   batch_size: 50
   lr: 0.50
   early_stopping:
     patience: 50
     lower_is_better: True
-  train_split:
-    cv: 0.1   # The proportion for validation
-    stratified: False
   gradient_clipping:
     gradient_clip_value: 0.5
   lr_scheduler: 
@@ -57,12 +61,7 @@ training_args:
     patience: 1
 
 grid_args:
-  verbose: 3
-  scoring: accuracy
   n_jobs: 1
-  train_split:
-    cv: 0.15
-    stratified: False
   model_args:
     input_size: [16, 64, 128, 512]
     hidden_size: [32, 256, 1024]
