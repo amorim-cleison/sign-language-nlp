@@ -4,8 +4,6 @@ from commons.util import load_args, save_json
 from sklearn.metrics import get_scorer
 from sklearn.model_selection import GridSearchCV, cross_val_score
 from skorch import NeuralNetClassifier
-from skorch.helper import SliceDataset
-from torch.utils.data import random_split
 
 import helper as h
 from args import ARGUMENTS
@@ -23,10 +21,13 @@ def run(args):
     device = h.prepare_device(args["cuda"])
 
     # Dataset:
-    dataset = AslDataset(device=device,
-                         batch_first=True,
-                         debug=args["debug"],
-                         **args["dataset_args"])
+    dataset = AslDataset(device=device, batch_first=True, **args)
+
+    if args["debug"]:
+        dataset = dataset.truncated(100)
+
+    # Balance dataset:
+    dataset = h.balance_dataset(dataset)
 
     # Callbacks:
     callbacks, callbacks_names = h.build_callbacks(**args,
@@ -75,11 +76,8 @@ def run_training_no_cv(net, dataset, scoring):
     _scorer = get_scorer(scoring)
 
     # Data split:
-    _len = len(dataset)
-    test_len = int(0.2 * _len)
-    train_len = int(_len - test_len)
-    train_ds, test_ds = random_split(dataset, [train_len, test_len])
-    y_test = dataset.collate_target(SliceDataset(test_ds, idx=1))
+    test_ds, train_ds = dataset.split(0.2)
+    y_test = test_ds.y(collated=True)
 
     # Fit:
     net.fit(train_ds, None)
@@ -90,17 +88,10 @@ def run_training_no_cv(net, dataset, scoring):
 
 
 def run_training_cv(net, dataset, cross_validator, scoring):
-    X_train = SliceDataset(dataset, idx=0)
-    y_train = SliceDataset(dataset, idx=1)
-
-    # https://scikit-learn.org/stable/modules/cross_validation.html
-
-    # TODO: deal with imbalanced dataset
-
     # Cross-validation:
     scores = cross_val_score(net,
-                             X_train,
-                             y_train,
+                             dataset.X(),
+                             dataset.y(),
                              cv=cross_validator,
                              scoring=ScoringWrapper(scoring),
                              error_score='raise')
@@ -111,18 +102,12 @@ def run_training_cv(net, dataset, cross_validator, scoring):
 
 
 def run_grid_search(net, callbacks_names, dataset, cross_validator, **kwargs):
-    # Slice data (sklearn is not compatible with 'dataset'):
-    X = SliceDataset(dataset, idx=0)
-    y = SliceDataset(dataset, idx=1)
-
     # Grid search:
     grid_params = h.build_grid_params(callbacks_names=callbacks_names,
                                       cross_validator=cross_validator,
-                                      X=X,
-                                      y=y,
                                       **kwargs)
     gs = GridSearchCV(net, **grid_params)
-    gs.fit(X, y)
+    gs.fit(dataset.X(), dataset.y())
 
     # Output:
     gs_output = {

@@ -1,11 +1,12 @@
 import json
 import tempfile
 
+from os.path import normpath
 import numpy as np
 import pandas as pd
 from commons.log import auto_log_progress
-from commons.util import (delete_file, exists, filename, filter_files,
-                          read_json, save_items)
+from commons.util import (exists, filename, filter_files, read_json,
+                          save_items, get_hash)
 from dataset.constant import PAD_WORD, UNK_WORD
 from torchtext.data import Field, TabularDataset, interleave_keys
 
@@ -15,42 +16,41 @@ class DatasetBuilder():
         pass
 
     def build(self,
-              debug,
               dataset_dir,
               fields,
               samples_min_freq,
               batch_first,
               composition_strategy="as_words"):
-        tmp = tempfile.NamedTemporaryFile(delete=False)
+        # Temp name:
+        _name = get_hash({
+            "dir": dataset_dir,
+            "fields": fields,
+            "min_freq": samples_min_freq,
+            "strategy": composition_strategy
+        })
+        path = normpath(f"{tempfile.gettempdir()}/{_name}.tmp")
 
-        try:
-            # Write transient working file:
-            self.write_working_file(path=tmp.name,
+        # Write transient working file:
+        if not exists(path):
+            self.write_working_file(path=path,
                                     dataset_dir=dataset_dir,
-                                    min_freq=samples_min_freq,
-                                    debug=debug)
+                                    min_freq=samples_min_freq)
 
-            # Dataset:
-            dataset, src_vocab, tgt_vocab, file_vocab = \
-                self.create_dataset(
-                    path=tmp.name,
-                    fields=fields,
-                    composition_strategy=composition_strategy,
-                    batch_first=batch_first)
+        # Dataset:
+        dataset, src_vocab, tgt_vocab, file_vocab = \
+            self.create_dataset(
+                path=path,
+                fields=fields,
+                composition_strategy=composition_strategy,
+                batch_first=batch_first)
 
-            return {
-                "dataset": dataset,
-                "vocabs": {
-                    "src": src_vocab,
-                    "tgt": tgt_vocab,
-                    "file": file_vocab
-                }
-            }
-        finally:
-            tmp.close()
-            delete_file(tmp.name)
+        return {
+            "dataset": dataset,
+            "src_vocab": src_vocab,
+            "tgt_vocab": tgt_vocab
+        }
 
-    def write_working_file(self, path, dataset_dir, min_freq, debug):
+    def write_working_file(self, path, dataset_dir, min_freq):
         def prefix(f):
             return f.stem.split('-')[0]
 
@@ -61,9 +61,6 @@ class DatasetBuilder():
 
         assert exists(dataset_dir), "Invalid dataset directory"
         files = filter_files(dataset_dir, ext="json", path_as_str=False)
-
-        if debug:
-            files = files[:100]
 
         # Group and filter data:
         df = pd.DataFrame({"file": files})
