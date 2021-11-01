@@ -44,8 +44,8 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
     _module_args = prefix_args("module",
                                ensure_list=False,
                                batch_first=dataset.batch_first,
-                               src_vocab=dataset.src_vocab,
-                               tgt_vocab=dataset.tgt_vocab,
+                               src_vocab=dataset.vocab_X,
+                               tgt_vocab=dataset.vocab_y,
                                **model_args)
 
     # Module args:
@@ -94,14 +94,12 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
     }
 
 
-def build_grid_params(grid_args, X, y, callbacks_names, model, workdir,
-                      scoring, cross_validator, verbose, **kwargs):
+def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
+                      cross_validator, verbose, **kwargs):
     def unpack(training_args,
                callbacks_names,
                model,
                workdir,
-               X,
-               y,
                cross_validator,
                scoring,
                verbose,
@@ -159,8 +157,6 @@ def build_grid_params(grid_args, X, y, callbacks_names, model, workdir,
                   cross_validator=cross_validator,
                   scoring=scoring,
                   verbose=verbose,
-                  X=X,
-                  y=y,
                   **grid_args)
 
 
@@ -182,8 +178,6 @@ def build_callbacks(model,
 
     # Callbacks:
     callbacks = []
-
-    # FIXME: add callback for scoring during training
 
     # Checkpoint saving:
     checkpoint = Checkpoint(monitor=f"{monitor}_loss_best", dirname=workdir)
@@ -255,14 +249,6 @@ def __unpack_dataset(ds):
         return None
 
 
-def get_collated_y(y):
-    ds = __unpack_dataset(y)
-
-    if ds is not None:
-        y = ds.collate_target(y).cpu().numpy()
-    return y
-
-
 def format_dir(dir, **kwargs):
     return normpath(dir.format(**kwargs)) if dir is not None else ''
 
@@ -305,6 +291,18 @@ def prefix_args(prefix, ensure_list=False, output=None, **kwargs):
     return output
 
 
+def balance_dataset(dataset):
+    from imblearn.over_sampling import RandomOverSampler
+
+    from dataset import AslDataset
+    resampler = RandomOverSampler()
+
+    X, y = dataset.X(fmt="array"), dataset.y(fmt="array")
+    X_resampled, y_resampled = resampler.fit_resample(X, y)
+
+    return AslDataset(dataset=dataset, data=(X_resampled, y_resampled))
+
+
 class ScoringWrapper:
     def __init__(self, score_func):
         from sklearn.metrics import get_scorer
@@ -312,7 +310,6 @@ class ScoringWrapper:
         self.scorer = get_scorer(score_func)
 
     def __call__(self, estimator, X, y_true, sample_weight=None):
-        y_true = get_collated_y(y_true)
         return self.scorer(estimator, X, y_true, sample_weight)
 
     def __repr__(self):

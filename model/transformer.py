@@ -91,8 +91,6 @@ class Transformer(nn.Module):
     def adjust_batch_in(self, data):
         """Transformer requires to be in the shape `(S,N,E)` where `S` is the
         sequence length, `N` batch size, and `E` is the feature number."""
-        # data = self.__fix_dims(data, 2)
-
         if data.ndim < 2:
             data = data.unsqueeze(-1)
         if self.batch_first:
@@ -102,7 +100,6 @@ class Transformer(nn.Module):
     def adjust_batch_out(self, data):
         if data.ndim > 2:
             data = data.squeeze(dim=0)
-        # data = self.__fix_dims(data, 2)
         return data
 
     def __fix_dims(self, data, tgt_dims):
