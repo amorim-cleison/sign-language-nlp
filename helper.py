@@ -293,14 +293,44 @@ def prefix_args(prefix, ensure_list=False, output=None, **kwargs):
 
 def balance_dataset(dataset):
     from imblearn.over_sampling import RandomOverSampler
+    from imblearn.under_sampling import RandomUnderSampler
+    from imblearn.pipeline import Pipeline
+    from collections import Counter
 
     from dataset import AslDataset
-    resampler = RandomOverSampler()
+    from statistics import mean
+    import math
 
+    def compute_sampling(data, mode="under"):
+        def smooth_v(v, u, sign):
+            tmp = round(u + math.log(v))
+            return v if (v * sign) > (tmp * sign) else tmp
+
+        _signs = {"under": -1, "over": +1}
+        assert (mode in _signs), "Invalid mode"
+
+        u = mean(data.values())
+        sign = _signs[mode]
+        return {k: smooth_v(v, u, sign) for (k, v) in data.items()}
+
+    # Original data:
     X, y = dataset.X(fmt="array"), dataset.y(fmt="array")
-    X_resampled, y_resampled = resampler.fit_resample(X, y)
+    original = Counter(y)
 
-    return AslDataset(dataset=dataset, data=(X_resampled, y_resampled))
+    # Compute samplings:
+    under_sampling = compute_sampling(original, "under")
+    over_sampling = compute_sampling(under_sampling, "over")
+
+    # Prepare pipeline:
+    rus = RandomUnderSampler(sampling_strategy=under_sampling)
+    ros = RandomOverSampler(sampling_strategy=over_sampling)
+    pipeline = Pipeline(steps=[("under", rus), ("over", ros)])
+
+    # Resample data:
+    X_res, y_res = pipeline.fit_resample(X, y)
+    dataset_res = AslDataset(dataset=dataset, data=(X_res, y_res))
+
+    return dataset_res
 
 
 class ScoringWrapper:
