@@ -165,14 +165,12 @@ def build_callbacks(model,
                     workdir,
                     resumable,
                     scoring,
+                    cross_validator,
                     early_stopping=None,
                     gradient_clipping=None,
                     lr_scheduler=None,
-                    cv=None,
-                    cv_args=None,
                     **kwargs):
     # Cross-validator:
-    cross_validator = get_cross_validator(cv=cv, cv_args=cv_args)
     has_valid = is_cv_for_net(cross_validator)
     monitor = "valid" if has_valid else "train"
 
@@ -221,7 +219,7 @@ def build_callbacks(model,
         ("score",
          EpochScoring(scoring=_score,
                       name=scoring,
-                      on_train=True,
+                      on_train=not has_valid,
                       lower_is_better=not _score.greater_is_better)))
 
     # Callbacks names:
@@ -263,9 +261,9 @@ def get_processed(dataset, field):
     return dataset.fields[field].process(data)
 
 
-def get_cross_validator(cv, cv_args, **kwargs):
+def get_cross_validator(cv, cv_args, seed, **kwargs):
     _cv = locate(cv)
-    return _cv(**cv_args)
+    return _cv(random_state=seed, **cv_args)
 
 
 def is_cv_for_net(cross_validator):
@@ -291,7 +289,7 @@ def prefix_args(prefix, ensure_list=False, output=None, **kwargs):
     return output
 
 
-def balance_dataset(dataset):
+def balance_dataset(dataset, seed):
     from imblearn.over_sampling import RandomOverSampler
     from imblearn.under_sampling import RandomUnderSampler
     from imblearn.pipeline import Pipeline
@@ -322,8 +320,9 @@ def balance_dataset(dataset):
     over_sampling = compute_sampling(under_sampling, "over")
 
     # Prepare pipeline:
-    rus = RandomUnderSampler(sampling_strategy=under_sampling)
-    ros = RandomOverSampler(sampling_strategy=over_sampling)
+    rus = RandomUnderSampler(sampling_strategy=under_sampling,
+                             random_state=seed)
+    ros = RandomOverSampler(sampling_strategy=over_sampling, random_state=seed)
     pipeline = Pipeline(steps=[("under", rus), ("over", ros)])
 
     # Resample data:

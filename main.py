@@ -27,14 +27,14 @@ def run(args):
         dataset = dataset.truncated(100)
 
     # Balance dataset:
-    dataset = h.balance_dataset(dataset)
-
-    # Callbacks:
-    callbacks, callbacks_names = h.build_callbacks(**args,
-                                                   **args["training_args"])
+    dataset = h.balance_dataset(dataset=dataset, seed=args["seed"])
 
     # Cross-validator:
     cross_validator = h.get_cross_validator(**args)
+
+    # Callbacks:
+    callbacks, callbacks_names = h.build_callbacks(
+        cross_validator=cross_validator, **args, **args["training_args"])
 
     # Classifier:
     net_params = h.build_net_params(callbacks=callbacks,

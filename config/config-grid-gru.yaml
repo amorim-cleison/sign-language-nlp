@@ -41,6 +41,10 @@ optimizer_args:
   # dampening: 0
   # weight_decay: 0
 
+cv_args:
+  n_splits: 3
+  test_size: 0.2
+
 training_args:
   max_epochs: 100 # Original: 100
   batch_size: 50
