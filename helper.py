@@ -343,7 +343,7 @@ class ScoringWrapper:
 
     def __call__(self, estimator, X, y_true, sample_weight=None):
         if isinstance(y_true, AslSliceDataset):
-            y_true = y_true.collated()
+            y_true = y_true.collated().cpu()
         return self.scorer(estimator, X, y_true, sample_weight)
 
     def __repr__(self):
