@@ -82,7 +82,7 @@ class AslDataset(Dataset):
             length = max(map(len, data))
             return np.array([x + [None] * (length - len(x)) for x in data])
 
-        data = SliceDataset(self, self.IDX_X)
+        data = AslSliceDataset(self, self.IDX_X)
 
         if fmt is not None:
             fn = {"array": as_array}
@@ -97,7 +97,7 @@ class AslDataset(Dataset):
         def as_array(data):
             return np.array(data)
 
-        data = SliceDataset(self, self.IDX_Y)
+        data = AslSliceDataset(self, self.IDX_Y)
 
         if fmt is not None:
             fn = {"array": as_array}
@@ -115,14 +115,13 @@ class AslDataset(Dataset):
         return {"X": X, "lengths": lengths, "y": y}, y
 
     def __collate_X(self, X):
-        field = self.__fields[self.IDX_X]
-        return self.__process_value(X, field)
+        return self._process_value(X, self.IDX_X)
 
     def __collate_y(self, y):
-        field = self.__fields[self.IDX_Y]
-        return self.__process_value(y, field).squeeze(-1)
+        return self._process_value(y, self.IDX_Y).squeeze(-1)
 
-    def __process_value(self, values, field):
+    def _process_value(self, values, field_idx):
+        field = self.__fields[field_idx]
         values = (self.__ensure_list(x) for x in values)
         return field.process(values, device=self.__device)
 
@@ -171,3 +170,19 @@ class AslDataset(Dataset):
 
         splits = random_split(self, lengths)
         return [AslDataset(dataset=self, data=s) for s in splits]
+
+
+class AslSliceDataset(SliceDataset):
+    def collated(self):
+        data = [self.dataset[x][self.idx] for x in self.indices]
+        return self.dataset._process_value(data, self.idx)
+
+    def __getitem__(self, i):
+        item = super().__getitem__(i)
+
+        if isinstance(item, SliceDataset):
+            return AslSliceDataset(dataset=item.dataset,
+                                   idx=item.idx,
+                                   indices=item.indices)
+        else:
+            return item

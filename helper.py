@@ -10,6 +10,8 @@ from skorch.callbacks import (Checkpoint, EarlyStopping, EpochScoring,
                               GradientNormClipping, LoadInitState, LRScheduler)
 from skorch.dataset import CVSplit
 
+from dataset import AslSliceDataset
+
 
 def setup_seed(seed, **kwargs):
     torch.manual_seed(seed)
@@ -290,14 +292,15 @@ def prefix_args(prefix, ensure_list=False, output=None, **kwargs):
 
 
 def balance_dataset(dataset, seed):
-    from imblearn.over_sampling import RandomOverSampler
-    from imblearn.under_sampling import RandomUnderSampler
-    from imblearn.pipeline import Pipeline
+    import math
     from collections import Counter
+    from statistics import mean
+
+    from imblearn.over_sampling import RandomOverSampler
+    from imblearn.pipeline import Pipeline
+    from imblearn.under_sampling import RandomUnderSampler
 
     from dataset import AslDataset
-    from statistics import mean
-    import math
 
     def compute_sampling(data, mode="under"):
         def smooth_v(v, u, sign):
@@ -339,6 +342,8 @@ class ScoringWrapper:
         self.scorer = get_scorer(score_func)
 
     def __call__(self, estimator, X, y_true, sample_weight=None):
+        if isinstance(y_true, AslSliceDataset):
+            y_true = y_true.collated()
         return self.scorer(estimator, X, y_true, sample_weight)
 
     def __repr__(self):
