@@ -191,7 +191,8 @@ def build_callbacks(model,
     if early_stopping:
         callbacks.append(("early_stopping",
                           EarlyStopping(**early_stopping,
-                                        monitor=f"{monitor}_loss")))
+                                        monitor=f"{monitor}_loss",
+                                        lower_is_better=True)))
 
     # Gradient clip:
     if gradient_clipping:

@@ -57,7 +57,6 @@ training_args:
   test_size: 0.2
   early_stopping:
     patience: 50
-    lower_is_better: True
   gradient_clipping:
     gradient_clip_value: 0.5
   lr_scheduler: 
