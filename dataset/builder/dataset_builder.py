@@ -4,7 +4,7 @@ import tempfile
 from os.path import normpath
 import numpy as np
 import pandas as pd
-from commons.log import auto_log_progress
+from commons.log import auto_log_progress, log
 from commons.util import (exists, filename, filter_files, read_json,
                           save_items, get_hash)
 from dataset.constant import PAD_WORD, UNK_WORD
@@ -21,6 +21,8 @@ class DatasetBuilder():
               samples_min_freq,
               batch_first,
               composition_strategy="as_words"):
+        log("Loading dataset...")
+
         # Temp name:
         _name = get_hash({
             "dir": dataset_dir,
@@ -31,7 +33,10 @@ class DatasetBuilder():
         path = normpath(f"{tempfile.gettempdir()}/{_name}.tmp")
 
         # Write transient working file:
-        if not exists(path):
+        if exists(path):
+            log(f"Reusing working data file found at '{path}'...")
+        else:
+            log("Creating working data file...")
             self.write_working_file(path=path,
                                     dataset_dir=dataset_dir,
                                     min_freq=samples_min_freq)

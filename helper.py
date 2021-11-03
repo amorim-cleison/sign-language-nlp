@@ -264,8 +264,10 @@ def get_processed(dataset, field):
 
 
 def get_cross_validator(cv, cv_args, seed, **kwargs):
-    _cv = locate(cv)
-    return _cv(random_state=seed, **cv_args)
+    if cv:
+        _cv_cls = locate(cv)
+        return _cv_cls(random_state=seed, **cv_args)
+    return None
 
 
 def is_cv_for_net(cross_validator):
