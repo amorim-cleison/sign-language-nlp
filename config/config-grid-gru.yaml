@@ -1,5 +1,4 @@
 debug: False
-log: Null
 cuda: True
 seed: 1
 mode: grid
@@ -7,6 +6,7 @@ resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
 scoring: accuracy
 verbose: 3
+n_jobs: -1
 
 model: model.GRU
 # optimizer: torch.optim.Adam

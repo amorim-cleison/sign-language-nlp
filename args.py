@@ -7,6 +7,7 @@ ARGUMENTS = [
     Argument('-cv', '--cv', help='Cross-validator class'),
     Argument('-s', '--scoring', type=str, help='Scoring metric to use'),
     Argument('-vb', '--verbose', type=int, help='Verbosity level'),
+    Argument('-j', '--n_jobs', type=int, default=1, help='Number of jobs'),
     Argument('-n', '--mode', options=["grid", "train"], help='Mode'),
     Argument('-r', '--resumable', type=bool, help='Resume tasks'),
     Argument('-w', '--workdir', help='Working directory'),

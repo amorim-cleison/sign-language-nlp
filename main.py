@@ -62,20 +62,23 @@ def run(args):
                         **args)
 
 
-def run_training(net, dataset, cross_validator, scoring, test_size, **kwargs):
+def run_training(net, dataset, cross_validator, scoring, test_size, n_jobs,
+                 **kwargs):
     if cross_validator:
         run_training_cv(net=net,
                         dataset=dataset,
                         cross_validator=cross_validator,
-                        scoring=scoring)
+                        scoring=scoring,
+                        n_jobs=n_jobs)
     else:
         run_training_no_cv(net=net,
                            dataset=dataset,
                            scoring=scoring,
-                           test_size=test_size)
+                           test_size=test_size,
+                           n_jobs=n_jobs)
 
 
-def run_training_no_cv(net, dataset, scoring, test_size):
+def run_training_no_cv(net, dataset, scoring, test_size, n_jobs):
     assert isinstance(
         test_size, float
     ), "`test_size` configuration is required for training without CV."
@@ -97,8 +100,8 @@ def run_training_no_cv(net, dataset, scoring, test_size):
     log(f"Test accuracy: {score:.3f}")
 
 
-def run_training_cv(net, dataset, cross_validator, scoring):
-    log("Training with cross-validation...")
+def run_training_cv(net, dataset, cross_validator, scoring, n_jobs):
+    log(f"Training with cross-validation ({cross_validator})...")
 
     # Cross-validation:
     scores = cross_val_score(net,
@@ -106,13 +109,15 @@ def run_training_cv(net, dataset, cross_validator, scoring):
                              dataset.y(),
                              cv=cross_validator,
                              scoring=ScoringWrapper(scoring),
-                             error_score='raise')
+                             error_score='raise',
+                             n_jobs=n_jobs)
 
     log(f"'{scoring.capitalize()}' per fold: {[f'{x:.3f}' for x in scores]}")
     log(f"AVG validation '{scoring}': {scores.mean():.3f}")
 
 
-def run_grid_search(net, callbacks_names, dataset, cross_validator, **kwargs):
+def run_grid_search(net, callbacks_names, dataset, cross_validator,
+                    **kwargs):
     log("Grid search...")
 
     # Grid search:

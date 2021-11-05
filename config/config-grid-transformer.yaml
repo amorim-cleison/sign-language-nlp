@@ -1,5 +1,4 @@
 debug: False
-log: Null
 cuda: True
 seed: 1
 mode: grid
@@ -7,6 +6,7 @@ resumable: False
 workdir: '../../work/sl-transformer/checkpoint/{model}/{mode}'
 scoring: accuracy
 verbose: 3
+n_jobs: -1
 
 model: model.Transformer
 # optimizer: torch.optim.Adam
@@ -65,7 +65,6 @@ training_args:
     patience: 1
 
 grid_args:
-  n_jobs: 1
   model_args:
     input_size: [64, 128, 256, 512]
     hidden_size: [128, 256, 512, 1024, 2048]

@@ -97,7 +97,7 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
 
 
 def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
-                      cross_validator, verbose, **kwargs):
+                      cross_validator, verbose, n_jobs, **kwargs):
     def unpack(training_args,
                callbacks_names,
                model,
@@ -105,6 +105,7 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
                cross_validator,
                scoring,
                verbose,
+               n_jobs,
                model_args={},
                optimizer_args={},
                criterion_args={},
@@ -144,6 +145,7 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
             "cv": cross_validator,
             "verbose": verbose,
             "scoring": _scoring,
+            "n_jobs": n_jobs,
             "error_score": "raise",
             **_grid_args, "param_grid": {
                 **_module_args,
@@ -159,6 +161,7 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
                   cross_validator=cross_validator,
                   scoring=scoring,
                   verbose=verbose,
+                  n_jobs=n_jobs,
                   **grid_args)
 
 
@@ -192,7 +195,8 @@ def build_callbacks(model,
         callbacks.append(("early_stopping",
                           EarlyStopping(**early_stopping,
                                         monitor=f"{monitor}_loss",
-                                        lower_is_better=True)))
+                                        lower_is_better=True,
+                                        sink=log)))
 
     # Gradient clip:
     if gradient_clipping:
@@ -327,9 +331,12 @@ def balance_dataset(dataset, seed):
 
     # Prepare pipeline:
     rus = RandomUnderSampler(sampling_strategy=under_sampling,
-                             random_state=seed)
+                             random_state=seed,
+                             replacement=False)
     ros = RandomOverSampler(sampling_strategy=over_sampling, random_state=seed)
-    pipeline = Pipeline(steps=[("under", rus), ("over", ros)])
+    pipeline = Pipeline(steps=[(type(rus).__name__, rus),
+                               (type(ros).__name__, ros)],
+                        verbose=True)
 
     # Resample data:
     X_res, y_res = pipeline.fit_resample(X, y)
