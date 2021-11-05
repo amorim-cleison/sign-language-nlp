@@ -47,8 +47,8 @@ optimizer_args:
   # eps: 10e-9 
 
 # cv_args:
-#   n_splits: 3
-#   test_size: 0.35
+#   n_splits: 2
+#   test_size: 0.25
 
 training_args:
   max_epochs: 1000 # Original: 100

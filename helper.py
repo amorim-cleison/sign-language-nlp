@@ -239,7 +239,9 @@ def build_callbacks_args(callbacks_names,
                          workdir,
                          ensure_list=False,
                          **kwargs):
-    callbacks_args = filter_by_keys(kwargs, callbacks_names)
+    __standard_callbacks = ["print_log"]
+    callbacks_args = filter_by_keys(kwargs,
+                                    callbacks_names + __standard_callbacks)
     return prefix_args("callbacks", ensure_list=ensure_list, **callbacks_args)
 
 
