@@ -5,7 +5,7 @@ seed: 1
 mode: grid
 resumable: False
 workdir: '../../work/sl-transformer/checkpoint/{model}/{mode}'
-scoring: balanced_accuracy
+scoring: accuracy
 verbose: 3
 
 model: model.Transformer

@@ -49,5 +49,14 @@
             "justMyCode": false,
             "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--mode", "train"]
         },
+        {
+            "name": "Train - LSTM",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "False", "--mode", "train"]
+        },
     ]
 }
