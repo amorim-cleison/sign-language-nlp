@@ -125,6 +125,9 @@ def run_grid_search(net, callbacks_names, dataset, cross_validator, **kwargs):
                                       cross_validator=cross_validator,
                                       **kwargs)
     gs = GridSearchCV(net, **grid_params)
+    log(gs)
+
+    # Fit:
     gs.fit(dataset.X(), dataset.y())
 
     # Output:

@@ -98,14 +98,14 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
 
 def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
                       cross_validator, verbose, n_jobs, **kwargs):
-    def unpack(training_args,
-               callbacks_names,
+    def unpack(callbacks_names,
                model,
                workdir,
                cross_validator,
                scoring,
                verbose,
                n_jobs,
+               training_args={},
                model_args={},
                optimizer_args={},
                criterion_args={},
@@ -131,6 +131,9 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
                                       ensure_list=True,
                                       **criterion_args)
 
+        # Training args:
+        _training_args = prefix_args(None, ensure_list=True, **training_args)
+
         # Other args:
         KEYS_FOR_GRID = [
             "n_jobs", "refit", "verbose", "pre_dispatch", "return_train_score"
@@ -151,7 +154,8 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
                 **_module_args,
                 **_optimizer_args,
                 **_criterion_args,
-                **_callbacks_args
+                **_callbacks_args,
+                **_training_args
             }
         }
 
