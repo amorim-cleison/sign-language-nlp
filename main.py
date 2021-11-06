@@ -28,6 +28,7 @@ def run(args):
 
     # Balance dataset:
     dataset = h.balance_dataset(dataset=dataset, seed=args["seed"])
+    log(f"{len(dataset)} entries of data")
 
     # Cross-validator:
     cross_validator = h.get_cross_validator(**args)
@@ -116,8 +117,7 @@ def run_training_cv(net, dataset, cross_validator, scoring, n_jobs):
     log(f"AVG validation '{scoring}': {scores.mean():.3f}")
 
 
-def run_grid_search(net, callbacks_names, dataset, cross_validator,
-                    **kwargs):
+def run_grid_search(net, callbacks_names, dataset, cross_validator, **kwargs):
     log("Grid search...")
 
     # Grid search:
