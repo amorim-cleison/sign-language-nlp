@@ -63,46 +63,16 @@ def run(args):
                         **args)
 
 
-def run_training(net, dataset, cross_validator, scoring, test_size, n_jobs,
-                 **kwargs):
-    if cross_validator:
-        run_training_cv(net=net,
-                        dataset=dataset,
-                        cross_validator=cross_validator,
-                        scoring=scoring,
-                        n_jobs=n_jobs)
-    else:
-        run_training_no_cv(net=net,
-                           dataset=dataset,
-                           scoring=scoring,
-                           test_size=test_size,
-                           n_jobs=n_jobs)
-
-
-def run_training_no_cv(net, dataset, scoring, test_size, n_jobs):
-    assert isinstance(
-        test_size, float
-    ), "`test_size` configuration is required for training without CV."
-    log(f"Training without cross-validation ({test_size:.0%} data for test)..."
-        )
-
-    # Scorer:
-    _scorer = get_scorer(scoring)
-
-    # Data split:
-    test_ds, train_ds = dataset.split(test_size)
-    y_test = test_ds.y(collated=True)
-
-    # Fit:
-    net.fit(train_ds, None)
-
-    # Scoring:
-    score = _scorer(net, test_ds, y_test.cpu())
-    log(f"Test accuracy: {score:.3f}")
+def run_training(net, dataset, cross_validator, scoring, n_jobs, **kwargs):
+    run_training_cv(net=net,
+                    dataset=dataset,
+                    cross_validator=cross_validator,
+                    scoring=scoring,
+                    n_jobs=n_jobs)
 
 
 def run_training_cv(net, dataset, cross_validator, scoring, n_jobs):
-    log(f"Training with cross-validation ({cross_validator})...")
+    log(f"Training ({cross_validator})...")
 
     # Cross-validation:
     scores = cross_val_score(net,
@@ -113,8 +83,8 @@ def run_training_cv(net, dataset, cross_validator, scoring, n_jobs):
                              error_score='raise',
                              n_jobs=n_jobs)
 
-    log(f"'{scoring.capitalize()}' per fold: {[f'{x:.3f}' for x in scores]}")
-    log(f"AVG validation '{scoring}': {scores.mean():.3f}")
+    log(f"'{scoring.capitalize()}': {[f'{x:.3f}' for x in scores]}")
+    log(f"AVG '{scoring}': {scores.mean():.3f}")
 
 
 def run_grid_search(net, callbacks_names, dataset, cross_validator, **kwargs):
