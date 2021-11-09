@@ -31,7 +31,7 @@ def run(args):
     log(f"{len(dataset)} entries of data")
 
     # Cross-validator:
-    cross_validator = h.get_cross_validator(**args)
+    cross_validator = h.get_cross_validator(dataset=dataset, **args)
 
     # Callbacks:
     callbacks, callbacks_names = h.build_callbacks(

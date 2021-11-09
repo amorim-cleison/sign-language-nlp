@@ -46,9 +46,9 @@ optimizer_args:
   # betas: [0.9, 0.98]
   # eps: 10e-9 
 
-# cv_args:
-#   n_splits: 2
-#   test_size: 0.25
+cv_args:
+  n_splits: 2
+  test_size: 0.25
 
 training_args:
   max_epochs: 1000 # Original: 100
@@ -71,6 +71,4 @@ grid_args:
     num_layers: [2, 6, 10]
     dropout: [0.0, 0.1, 0.3]
     num_heads: [2, 4, 8, 16]
-  training_args:
-    lr: [0.1, 0.01, 0.001]
     

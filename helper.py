@@ -274,10 +274,24 @@ def get_processed(dataset, field):
     return dataset.fields[field].process(data)
 
 
-def get_cross_validator(cv, cv_args, seed, **kwargs):
+def get_cross_validator(cv,
+                        cv_args,
+                        seed,
+                        dataset=None,
+                        training_args={},
+                        **kwargs):
     if cv:
         _cv_cls = locate(cv)
         return _cv_cls(random_state=seed, **cv_args)
+    elif dataset:
+        assert (
+            "test_size"
+            in training_args), "You must inform `test_size` in training_args."
+        test_size = training_args["test_size"]
+        (_, test_idxs), (_, train_idxs) = dataset.split(test_size,
+                                                        return_indices=True,
+                                                        seed=seed)
+        return iter([(train_idxs, test_idxs)])
     return None
 
 
