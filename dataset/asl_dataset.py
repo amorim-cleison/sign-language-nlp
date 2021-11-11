@@ -72,7 +72,10 @@ class AslDataset(Dataset):
         return self.__batch_first
 
     def __getitem__(self, idx):
-        return self.__data[idx]
+        if isinstance(idx, list):
+            return [self.__data[i] for i in idx]
+        else:
+            return self.__data[idx]
 
     def __len__(self):
         return len(self.__data)
