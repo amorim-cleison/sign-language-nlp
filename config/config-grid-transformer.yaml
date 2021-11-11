@@ -29,6 +29,7 @@ dataset_args:
   ]
   samples_min_freq: 2   # How many samples for the label should exist in dataset for the label to be considered?
   composition_strategy: as_words
+  reuse_transient: False
 
 model_args:
   input_size: 512

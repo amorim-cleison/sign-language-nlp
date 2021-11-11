@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from commons.log import auto_log_progress, log
 from commons.util import (exists, filename, filter_files, read_json,
-                          save_items, get_hash)
+                          save_items, get_hash, delete_file)
 from dataset.constant import PAD_WORD, UNK_WORD
 from torchtext.data import Field, TabularDataset, interleave_keys
 
@@ -20,7 +20,8 @@ class DatasetBuilder():
               fields,
               samples_min_freq,
               batch_first,
-              composition_strategy="as_words"):
+              composition_strategy="as_words",
+              reuse_transient=False):
         log("Loading dataset...")
 
         # Temp name:
@@ -31,6 +32,10 @@ class DatasetBuilder():
             "strategy": composition_strategy
         })
         path = normpath(f"{tempfile.gettempdir()}/{_name}.tmp")
+
+        # Should reuse transient file?
+        if (not reuse_transient) and exists(path):
+            delete_file(path)
 
         # Write transient working file:
         if exists(path):
