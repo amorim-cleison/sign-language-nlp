@@ -32,9 +32,9 @@ dataset_args:
 
 model_args:
   input_size: 512
-  hidden_size: 2048
-  num_layers: 6
-  dropout: 0.1
+  hidden_size: 1866
+  num_layers: 2
+  dropout: 0.2
 
 optimizer_args:
   # SGD ---
@@ -43,10 +43,6 @@ optimizer_args:
   # dampening: 0
   # weight_decay: 0
 
-# cv_args:
-#   n_splits: 3
-#   test_size: 0.2
-
 cv_args:
   n_splits: 10
   test_size: 0.15
@@ -54,10 +50,12 @@ cv_args:
 training_args:
   max_epochs: 500 # Original: 100
   batch_size: 50
-  lr: 0.5
+  lr: 0.05
   test_size: 0.2
   early_stopping:
-    patience: 50
+    patience: 10
+    threshold: 1e-4
+    threshold_mode: abs
   gradient_clipping:
     gradient_clip_value: 0.5
   lr_scheduler: 
