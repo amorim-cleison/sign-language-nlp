@@ -72,7 +72,6 @@ class RNNModel(nn.Module):
             lengths = util.resolve_lengths(X, self.src_vocab)
 
         output = self.encoder(X)
-        output = self.drop(output)
 
         # Pack:
         output = t.pack_padded_sequence(input=output,
@@ -82,8 +81,9 @@ class RNNModel(nn.Module):
 
         # Forward:
         output = self._forward_rnn(output, hidden)
+        output = self.drop(output)
         output = self.linear(output)
-        # output = self.softmax(output, dim=-1)
+        output = self.softmax(output, dim=-1)
         return output
 
     def _forward_rnn(self, input, hidden):
