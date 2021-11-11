@@ -13,7 +13,8 @@ model: model.Transformer
 optimizer: torch.optim.SGD
 criterion: torch.nn.CrossEntropyLoss
 # cv: sklearn.model_selection.StratifiedShuffleSplit
-cv: Null
+# cv: Null
+cv: sklearn.model_selection.ShuffleSplit
 
 dataset_args:
   dataset_dir: ../../work/dataset/asl-phono/phonology/3d
@@ -46,14 +47,18 @@ optimizer_args:
   # betas: [0.9, 0.98]
   # eps: 10e-9 
 
+# cv_args:
+#   n_splits: 2
+  # test_size: 0.25
+
 cv_args:
-  n_splits: 2
-  test_size: 0.25
+  n_splits: 10
+  test_size: 0.15
 
 training_args:
-  max_epochs: 1000 # Original: 100
+  max_epochs: 500 # Original: 100
   batch_size: 50
-  lr: 0.01
+  lr: 0.5
   test_size: 0.2
   early_stopping:
     patience: 50
