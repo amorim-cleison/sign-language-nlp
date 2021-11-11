@@ -20,7 +20,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "False","--mode", "grid"]
+            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "False","--mode", "grid", "--n_jobs", "2"]
         },
         {
             "name": "Grid - Transformer",
@@ -29,7 +29,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--mode", "grid"]
+            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--mode", "grid", "--n_jobs", "2"]
         },
         {
             "name": "Grid - GRU",
@@ -38,7 +38,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-gru.yaml", "--cuda", "False", "--debug", "False", "--mode", "grid"]
+            "args": ["-c", "config/config-grid-gru.yaml", "--cuda", "False", "--debug", "False", "--mode", "grid", "--n_jobs", "2"]
         },
         {
             "name": "Train - Transformer",
@@ -47,7 +47,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--mode", "train"]
+            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--mode", "train", "--n_jobs", "2"]
         },
         {
             "name": "Train - LSTM",
@@ -56,7 +56,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "False", "--mode", "train"]
+            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "False", "--mode", "train", "--n_jobs", "2"]
         },
     ]
 }
