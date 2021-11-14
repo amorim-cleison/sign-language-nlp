@@ -282,7 +282,10 @@ def get_cross_validator(cv,
                         **kwargs):
     if cv:
         _cv_cls = locate(cv)
-        return _cv_cls(random_state=seed, **cv_args)
+
+        if "shuffle" in kwargs:
+            cv_args["random_state"] = seed
+        return _cv_cls(**cv_args)
     elif dataset:
         assert (
             "test_size"

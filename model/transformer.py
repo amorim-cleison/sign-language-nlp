@@ -102,17 +102,6 @@ class Transformer(nn.Module):
             data = data.squeeze(dim=0)
         return data
 
-    def __fix_dims(self, data, tgt_dims):
-        _dim = 0 if self.batch_first else 1
-
-        if data.ndim == tgt_dims:
-            return data
-        elif data.ndim < tgt_dims:
-            _dim = 0 if self.batch_first else 1
-            return self.__fix_dims(data.unsqueeze(_dim), tgt_dims)
-        elif data.ndim > tgt_dims:
-            return self.__fix_dims(data.squeeze(), tgt_dims)
-
     def forward_embedding(self, x, embedding, pos_encoding):
         x = embedding(x) * math.sqrt(self.input_size)
         x = pos_encoding(x)
