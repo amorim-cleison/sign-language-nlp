@@ -150,7 +150,7 @@ class AslDataset(Dataset):
     def truncated(self, length):
         return AslDataset(dataset=self, data=self.__data[0:length])
 
-    def split(self, lengths, return_indices=False, seed=None):
+    def split(self, lengths, indices_only=False, seed=None):
         from torch.utils.data import random_split
 
         def parse_int(len, total_len):
@@ -176,13 +176,14 @@ class AslDataset(Dataset):
                               lengths=lengths,
                               generator=generator)
 
-        def get_item(split, return_indices):
-            item = AslDataset(dataset=self, data=split)
-            if return_indices:
-                item = (item, split.indices)
+        def get_item(split, indices_only):
+            if indices_only:
+                item = split.indices
+            else:
+                item = AslDataset(dataset=self, data=split)
             return item
 
-        return [get_item(s, return_indices) for s in splits]
+        return [get_item(s, indices_only) for s in splits]
 
 
 class AslSliceDataset(SliceDataset):

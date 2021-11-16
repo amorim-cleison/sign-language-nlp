@@ -224,14 +224,15 @@ def build_callbacks(model,
                                       **lr_scheduler)))
 
     # Scoring metric (dynamic):
-    _score = ScoringWrapper(scoring)
+    if (not has_valid) or (scoring != "accuracy"):
+        _score = ScoringWrapper(scoring)
 
-    callbacks.append(
-        ("score",
-         EpochScoring(scoring=_score,
-                      name=scoring,
-                      on_train=not has_valid,
-                      lower_is_better=not _score.greater_is_better)))
+        callbacks.append(
+            ("score",
+             EpochScoring(scoring=_score,
+                          name=f"{monitor}_{scoring}",
+                          on_train=not has_valid,
+                          lower_is_better=not _score.greater_is_better)))
 
     # Callbacks names:
     callbacks_names = [c[0] for c in callbacks]
@@ -291,9 +292,9 @@ def get_cross_validator(cv,
             "test_size"
             in training_args), "You must inform `test_size` in training_args."
         test_size = training_args["test_size"]
-        (_, test_idxs), (_, train_idxs) = dataset.split(test_size,
-                                                        return_indices=True,
-                                                        seed=seed)
+        test_idxs, train_idxs = dataset.split(test_size,
+                                              indices_only=True,
+                                              seed=seed)
         return iter([(train_idxs, test_idxs)])
     return None
 

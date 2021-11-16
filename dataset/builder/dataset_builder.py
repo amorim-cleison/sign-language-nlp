@@ -21,7 +21,8 @@ class DatasetBuilder():
               samples_min_freq,
               batch_first,
               composition_strategy="as_words",
-              reuse_transient=False):
+              reuse_transient=False,
+              **kwargs):
         log("Loading dataset...")
 
         # Temp name:

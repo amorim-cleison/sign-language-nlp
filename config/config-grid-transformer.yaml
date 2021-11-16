@@ -13,8 +13,8 @@ model: model.Transformer
 optimizer: torch.optim.SGD
 criterion: torch.nn.CrossEntropyLoss
 # cv: sklearn.model_selection.StratifiedShuffleSplit
-# cv: Null
-cv: sklearn.model_selection.ShuffleSplit
+cv: Null
+# cv: sklearn.model_selection.ShuffleSplit
 
 dataset_args:
   dataset_dir: ../../work/dataset/asl-phono/phonology/3d
@@ -29,7 +29,8 @@ dataset_args:
   ]
   samples_min_freq: 2   # How many samples for the label should exist in dataset for the label to be considered?
   composition_strategy: as_words
-  reuse_transient: False
+  reuse_transient: True
+  balance_dataset: True
 
 model_args:
   input_size: 512
@@ -53,10 +54,10 @@ cv_args:
   test_size: 0.15
 
 training_args:
-  max_epochs: 500 # Original: 100
+  max_epochs: 100 # Original: 100
   batch_size: 50
   lr: 0.05
-  test_size: 0.2
+  test_size: 0.1
   early_stopping:
     patience: 10
     threshold: 1e-4
@@ -69,10 +70,13 @@ training_args:
     patience: 1
 
 grid_args:
-  model_args:
-    input_size: [64, 128, 256, 512]
-    hidden_size: [128, 256, 512, 1024, 2048]
-    num_layers: [2, 6, 10]
-    dropout: [0.0, 0.1, 0.3]
-    num_heads: [2, 4, 8, 16]
+  training_args:
+    batch_size: [50, 128]
+    lr: [0.5, 0.05]
+  # model_args:
+  #   input_size: [64, 128, 256, 512]
+  #   hidden_size: [128, 256, 512, 1024, 2048]
+  #   num_layers: [2, 6, 10]
+  #   dropout: [0.0, 0.1, 0.3]
+  #   num_heads: [2, 4, 8, 16]
     

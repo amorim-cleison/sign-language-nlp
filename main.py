@@ -1,8 +1,7 @@
 import pandas as pd
 from commons.log import log
 from commons.util import load_args, save_json
-from sklearn.metrics import get_scorer
-from sklearn.model_selection import GridSearchCV, cross_val_score
+from sklearn.model_selection import GridSearchCV
 from skorch import NeuralNetClassifier
 
 import helper as h
@@ -24,14 +23,17 @@ def run(args):
     dataset = AslDataset(device=device, batch_first=True, **args)
 
     if args["debug"]:
-        dataset = dataset.truncated(100)
+        dataset = dataset.truncated(1000)
 
     # Balance dataset:
-    dataset = h.balance_dataset(dataset=dataset, seed=args["seed"])
+    if should_balance_dataset(args):
+        dataset = h.balance_dataset(dataset=dataset, seed=args["seed"])
     log(f"{len(dataset)} entries of data")
 
     # Cross-validator:
-    cross_validator = h.get_cross_validator(dataset=dataset, **args)
+    # cross_validator = h.get_cross_validator(dataset=dataset, **args)
+    from skorch.dataset import CVSplit
+    cross_validator = CVSplit(5)
 
     # Callbacks:
     callbacks, callbacks_names = h.build_callbacks(
@@ -74,17 +76,24 @@ def run_training(net, dataset, cross_validator, scoring, n_jobs, **kwargs):
 def run_training_cv(net, dataset, cross_validator, scoring, n_jobs):
     log(f"Training ({cross_validator})...")
 
-    # Cross-validation:
-    scores = cross_val_score(net,
-                             dataset.X(),
-                             dataset.y(),
-                             cv=cross_validator,
-                             scoring=ScoringWrapper(scoring),
-                             error_score='raise',
-                             n_jobs=n_jobs)
+    test, train = dataset.split(0.1, indices_only=False)
 
-    log(f"'{scoring.capitalize()}': {[f'{x:.3f}' for x in scores]}")
-    log(f"AVG '{scoring}': {scores.mean():.3f}")
+    net.fit(train.X(), train.y())
+
+    score = net.score(test.X(), test.y(collated=True))
+    log(f"Test score: {score:.4f}")
+
+    # Cross-validation:
+    # scores = cross_val_score(net,
+    #                          dataset.X(),
+    #                          dataset.y(),
+    #                          cv=cross_validator,
+    #                          scoring=ScoringWrapper(scoring),
+    #                          error_score='raise',
+    #                          n_jobs=n_jobs)
+
+    # log(f"'{scoring.capitalize()}': {[f'{x:.3f}' for x in scores]}")
+    # log(f"AVG '{scoring}': {scores.mean():.3f}")
 
 
 def run_grid_search(net, callbacks_names, dataset, cross_validator, **kwargs):
@@ -114,6 +123,11 @@ def run_grid_search(net, callbacks_names, dataset, cross_validator, **kwargs):
     save_json(data=gs_output, path=f"{args['workdir']}/grid_search.json")
     pd.DataFrame(
         gs.cv_results_).to_csv(f"{args['workdir']}/grid_search_results.csv")
+
+
+def should_balance_dataset(args):
+    return ("balance_dataset" in args["dataset_args"]) and (
+        args["dataset_args"]["balance_dataset"] is True)
 
 
 if __name__ == "__main__":
