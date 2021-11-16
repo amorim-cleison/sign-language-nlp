@@ -80,7 +80,7 @@ def run_training_cv(net, dataset, cross_validator, scoring, n_jobs):
 
     net.fit(train.X(), train.y())
 
-    score = net.score(test.X(), test.y(collated=True))
+    score = net.score(test.X(), test.y(collated=True).cpu())
     log(f"Test score: {score:.4f}")
 
     # Cross-validation:
