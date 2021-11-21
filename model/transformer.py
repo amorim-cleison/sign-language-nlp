@@ -56,7 +56,7 @@ class Transformer(nn.Module):
         self.device = device
         return super().to(device)
 
-    def forward(self, X, y, **kwargs):
+    def forward(self, X, y, lengths=None, **kwargs):
         assert (X is not None), "`X` is a required paramenter"
         assert (y is not None), "`y` is a required paramenter"
 

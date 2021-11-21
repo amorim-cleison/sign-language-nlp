@@ -62,7 +62,7 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
 
     # Iterators args:
     iterators_args = {
-        "collate_fn": dataset.collate,
+        # "collate_fn": dataset.collate,
         # "num_workers": 4,
         # "shuffle": True
     }

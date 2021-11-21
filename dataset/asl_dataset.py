@@ -16,6 +16,7 @@ class AslDataset(Dataset):
                  dataset=None,
                  device=None,
                  data=None,
+                 collated=False,
                  **kwargs):
         super(AslDataset).__init__()
 
@@ -47,11 +48,22 @@ class AslDataset(Dataset):
         data = ((self.__ensure_list(o[self.IDX_X]),
                  self.__ensure_not_list(o[self.IDX_Y])) for o in data)
 
+        # Collation:
+        if collated:
+            data_X, data_y = zip(*data)
+            data_X = self.__collate_X(data_X, fields, device)
+            data_y = self.__collate_y(data_y, fields, device)
+
+            if len(data_X) > 1:
+                data_X = zip(*data_X)
+            data = zip(data_X, data_y)
+
         self.__data = list(data)
         self.__device = device
         self.__batch_first = batch_first
         self.__fields = fields
         self.__vocabs = vocabs
+        self.__collated = collated
 
     def __load_data(self, batch_first, dataset_args):
         dataset_objs = DatasetBuilder().build(batch_first=batch_first,
@@ -71,6 +83,10 @@ class AslDataset(Dataset):
     def batch_first(self):
         return self.__batch_first
 
+    @property
+    def collated(self):
+        return self.__collated
+
     def __getitem__(self, idx):
         if isinstance(idx, list):
             return [self.__data[i] for i in idx]
@@ -80,7 +96,7 @@ class AslDataset(Dataset):
     def __len__(self):
         return len(self.__data)
 
-    def X(self, fmt=None, collated=False):
+    def X(self, fmt=None):
         def as_array(data):
             length = max(map(len, data))
             return np.array([x + [None] * (length - len(x)) for x in data])
@@ -91,12 +107,9 @@ class AslDataset(Dataset):
             fn = {"array": as_array}
             assert (fmt in fn), "Invalid format"
             data = fn[fmt](data)
-
-        if collated:
-            data = self.collate_X(data)
         return data
 
-    def y(self, fmt=None, collated=False):
+    def y(self, fmt=None):
         def as_array(data):
             return np.array(data)
 
@@ -106,27 +119,28 @@ class AslDataset(Dataset):
             fn = {"array": as_array}
             assert (fmt in fn), "Invalid format"
             data = fn[fmt](data)
-
-        if collated:
-            data = self.__collate_y(data)
         return data
 
-    def collate(self, data):
-        X, y = zip(*data)
-        X, lengths = self.__collate_X(X)
-        y = self.__collate_y(y)
-        return {"X": X, "lengths": lengths, "y": y}, y
+    def __collate_X(self, X, fields=None, device=None):
+        return self._process_value(values=X,
+                                   field_idx=self.IDX_X,
+                                   fields=fields,
+                                   device=device)
 
-    def __collate_X(self, X):
-        return self._process_value(X, self.IDX_X)
+    def __collate_y(self, y, fields=None, device=None):
+        return self._process_value(values=y,
+                                   field_idx=self.IDX_Y,
+                                   fields=fields,
+                                   device=device).squeeze(-1)
 
-    def __collate_y(self, y):
-        return self._process_value(y, self.IDX_Y).squeeze(-1)
-
-    def _process_value(self, values, field_idx):
-        field = self.__fields[field_idx]
+    def _process_value(self, values, field_idx, fields=None, device=None):
+        if fields is None:
+            fields = self.__fields
+        if device is None:
+            device = self.__device
+        field = fields[field_idx]
         values = (self.__ensure_list(x) for x in values)
-        return field.process(values, device=self.__device)
+        return field.process(values, device=device)
 
     def __ensure_list(self, o):
         # Fix type:
@@ -146,6 +160,9 @@ class AslDataset(Dataset):
         if isinstance(o, (list, np.ndarray)):
             o = o[0]
         return o
+
+    def collated(self):
+        return AslDataset(dataset=self, data=self.__data, collated=True)
 
     def truncated(self, length):
         return AslDataset(dataset=self, data=self.__data[0:length])

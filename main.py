@@ -1,7 +1,7 @@
 import pandas as pd
 from commons.log import log
 from commons.util import load_args, save_json
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, cross_val_score
 from skorch import NeuralNetClassifier
 
 import helper as h
@@ -46,6 +46,24 @@ def run(args):
                                     dataset=dataset,
                                     cross_validator=cross_validator,
                                     **args)
+
+    # FIXME -------------------------------
+    import torch.nn as nn
+    import torch
+
+    def collate(data):
+        X, y = zip(*data)
+        X, X_lengths = zip(*X)
+
+        X = torch.stack(X)
+        X_lengths = torch.stack(X_lengths)
+        y = torch.stack(y)
+        return {"X": X, "lengths": X_lengths, "y": y}, y
+
+    net_params["iterator_train__collate_fn"] = collate
+    net_params["iterator_valid__collate_fn"] = collate
+    # ---------------------------------------
+
     net = NeuralNetClassifier(**net_params)
 
     # Train:
@@ -76,18 +94,20 @@ def run_training(net, dataset, cross_validator, scoring, n_jobs, **kwargs):
 def run_training_cv(net, dataset, cross_validator, scoring, n_jobs):
     log(f"Training ({cross_validator})...")
 
-    test, train = dataset.split(0.1, indices_only=False)
+    test, train = dataset.collated().split(0.2, indices_only=False)
 
-    net.fit(train.X(), train.y())
+    # Fit:
+    net.fit(train, train.y())
 
-    score = net.score(test.X(), test.y(collated=True).cpu())
+    # Score:
+    score = net.score(test, test.y())
     log(f"Test score: {score:.4f}")
 
     # Cross-validation:
     # scores = cross_val_score(net,
-    #                          dataset.X(),
-    #                          dataset.y(),
-    #                          cv=cross_validator,
+    #                          dataset.collated(),
+    #                          dataset.collated().y(),
+    #                          cv=5,
     #                          scoring=ScoringWrapper(scoring),
     #                          error_score='raise',
     #                          n_jobs=n_jobs)
