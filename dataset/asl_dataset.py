@@ -204,6 +204,10 @@ class AslDataset(Dataset):
 
 
 class AslSliceDataset(SliceDataset):
+    def __init__(self, dataset, idx=0, indices=None, cpu=False):
+        self.__cpu = cpu
+        super().__init__(dataset, idx=idx, indices=indices)
+
     def collated(self):
         data = [self.dataset[x][self.idx] for x in self.indices]
         return self.dataset._process_value(data, self.idx)
@@ -216,4 +220,17 @@ class AslSliceDataset(SliceDataset):
                                    idx=item.idx,
                                    indices=item.indices)
         else:
+            if self.__cpu:
+                item = self.__ensure_cpu(item)
             return item
+
+    def __ensure_cpu(self, item):
+        if torch.is_tensor(item):
+            return item.cpu()
+        return item
+
+    def cpu(self):
+        return AslSliceDataset(dataset=self.dataset,
+                               idx=self.idx,
+                               indices=self.indices,
+                               cpu=True)
