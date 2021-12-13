@@ -16,7 +16,7 @@ class AslDataset(Dataset):
                  dataset=None,
                  device=None,
                  data=None,
-                 collated=False,
+                 vocab_fmt="itos",
                  **kwargs):
         super(AslDataset).__init__()
 
@@ -44,32 +44,58 @@ class AslDataset(Dataset):
             vocabs = (src_vocab, tgt_vocab)
             data = zip(dataset.src, dataset.tgt)
 
+        # Vocab format:
+        if vocab_fmt == "stoi":
+            data = self.__data_stoi(data, fields, device)
+
         # Fix formats:
-        data = ((self.__ensure_list(o[self.IDX_X]),
-                 self.__ensure_not_list(o[self.IDX_Y])) for o in data)
+        data = self.__fix_formats(data)
 
-        # Collation:
-        if collated:
-            data_X, data_y = zip(*data)
-            data_X = self.__collate_X(data_X, fields, device)
-            data_y = self.__collate_y(data_y, fields, device)
-
-            if len(data_X) > 1:
-                data_X = zip(*data_X)
-            data = zip(data_X, data_y)
+        # Compose data:
+        data = self.__fix_compose_data(data)
 
         self.__data = list(data)
         self.__device = device
         self.__batch_first = batch_first
         self.__fields = fields
         self.__vocabs = vocabs
-        self.__collated = collated
+        self.__vocab_fmt = vocab_fmt
 
     def __load_data(self, batch_first, dataset_args):
         dataset_objs = DatasetBuilder().build(batch_first=batch_first,
                                               **dataset_args)
         return dataset_objs["dataset"], dataset_objs[
             "src_vocab"], dataset_objs["tgt_vocab"]
+
+    def __fix_formats(self, data):
+        def fix_y(y):
+            return self.__ensure_not_list(y)
+
+        def fix_X(X):
+            if isinstance(X, tuple):
+                if len(X) == 1:
+                    _X = self.__ensure_list(X)
+                elif len(X) == 2:
+                    X, lengths = X
+                    _X = self.__ensure_list(X), self.__ensure_not_list(lengths)
+                else:
+                    raise Exception("Invalid `X` length")
+            else:
+                _X = self.__ensure_list(X)
+            return _X
+
+        return ((fix_X(o[self.IDX_X]), fix_y(o[self.IDX_Y])) for o in data)
+
+    def __fix_compose_data(self, data):
+        def compose(X, y):
+            if isinstance(X, (list, tuple)) and \
+               (len(X) == 2) and \
+               (X[1] == y):
+                X = X[0]
+            _X = (X, y)
+            return (_X, y)
+
+        return (compose(o[self.IDX_X], o[self.IDX_Y]) for o in data)
 
     @property
     def vocab_X(self):
@@ -83,12 +109,8 @@ class AslDataset(Dataset):
     def batch_first(self):
         return self.__batch_first
 
-    @property
-    def collated(self):
-        return self.__collated
-
     def __getitem__(self, idx):
-        if isinstance(idx, list):
+        if isinstance(idx, (list, tuple, np.ndarray)):
             return [self.__data[i] for i in idx]
         else:
             return self.__data[idx]
@@ -96,44 +118,28 @@ class AslDataset(Dataset):
     def __len__(self):
         return len(self.__data)
 
-    def X(self, fmt=None):
-        def as_array(data):
-            length = max(map(len, data))
-            return np.array([x + [None] * (length - len(x)) for x in data])
+    def X(self):
+        return AslSliceDataset(self, self.IDX_X)
 
-        data = AslSliceDataset(self, self.IDX_X)
+    def y(self):
+        return AslSliceDataset(self, self.IDX_Y)
 
-        if fmt is not None:
-            fn = {"array": as_array}
-            assert (fmt in fn), "Invalid format"
-            data = fn[fmt](data)
-        return data
-
-    def y(self, fmt=None):
-        def as_array(data):
-            return np.array(data)
-
-        data = AslSliceDataset(self, self.IDX_Y)
-
-        if fmt is not None:
-            fn = {"array": as_array}
-            assert (fmt in fn), "Invalid format"
-            data = fn[fmt](data)
-        return data
-
-    def __collate_X(self, X, fields=None, device=None):
-        return self._process_value(values=X,
+    def __data_stoi(self, data, fields, device):
+        X, y = zip(*data)
+        X = [x[0] for x in X]
+        data_X = self.__field_stoi(values=X,
                                    field_idx=self.IDX_X,
                                    fields=fields,
                                    device=device)
-
-    def __collate_y(self, y, fields=None, device=None):
-        return self._process_value(values=y,
+        data_y = self.__field_stoi(values=y,
                                    field_idx=self.IDX_Y,
                                    fields=fields,
                                    device=device).squeeze(-1)
+        if len(data_X) > 1:
+            data_X = zip(*data_X)
+        return zip(data_X, data_y)
 
-    def _process_value(self, values, field_idx, fields=None, device=None):
+    def __field_stoi(self, values, field_idx, fields=None, device=None):
         if fields is None:
             fields = self.__fields
         if device is None:
@@ -159,10 +165,15 @@ class AslDataset(Dataset):
     def __ensure_not_list(self, o):
         if isinstance(o, (list, np.ndarray)):
             o = o[0]
+        elif torch.is_tensor(o):
+            if (o.ndim < 1):
+                o = o.item()
+            else:
+                raise Exception("Unexpected ndim for o.")
         return o
 
-    def collated(self):
-        return AslDataset(dataset=self, data=self.__data, collated=True)
+    def stoi(self):
+        return AslDataset(dataset=self, data=self.__data, vocab_fmt="stoi")
 
     def truncated(self, length):
         return AslDataset(dataset=self, data=self.__data[0:length])
@@ -208,21 +219,17 @@ class AslSliceDataset(SliceDataset):
         self.__cpu = cpu
         super().__init__(dataset, idx=idx, indices=indices)
 
-    def collated(self):
-        data = [self.dataset[x][self.idx] for x in self.indices]
-        return self.dataset._process_value(data, self.idx)
-
     def __getitem__(self, i):
         item = super().__getitem__(i)
 
         if isinstance(item, SliceDataset):
-            return AslSliceDataset(dataset=item.dataset,
+            item = AslSliceDataset(dataset=item.dataset,
                                    idx=item.idx,
                                    indices=item.indices)
         else:
             if self.__cpu:
                 item = self.__ensure_cpu(item)
-            return item
+        return item
 
     def __ensure_cpu(self, item):
         if torch.is_tensor(item):

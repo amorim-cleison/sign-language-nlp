@@ -47,23 +47,6 @@ def run(args):
                                     cross_validator=cross_validator,
                                     **args)
 
-    # FIXME -------------------------------
-    import torch.nn as nn
-    import torch
-
-    def collate(data):
-        X, y = zip(*data)
-        X, X_lengths = zip(*X)
-
-        X = torch.stack(X)
-        X_lengths = torch.stack(X_lengths)
-        y = torch.stack(y)
-        return {"X": X, "lengths": X_lengths, "y": y}, y
-
-    net_params["iterator_train__collate_fn"] = collate
-    net_params["iterator_valid__collate_fn"] = collate
-    # ---------------------------------------
-
     net = NeuralNetClassifier(**net_params)
 
     # Train:
@@ -94,7 +77,7 @@ def run_training(net, dataset, cross_validator, scoring, n_jobs, **kwargs):
 def run_training_cv(net, dataset, cross_validator, scoring, n_jobs):
     log(f"Training ({cross_validator})...")
 
-    test, train = dataset.collated().split(0.2, indices_only=False)
+    test, train = dataset.stoi().split(0.2, indices_only=False)
 
     # Fit:
     net.fit(train, train.y().cpu())
@@ -105,8 +88,8 @@ def run_training_cv(net, dataset, cross_validator, scoring, n_jobs):
 
     # Cross-validation:
     # scores = cross_val_score(net,
-    #                          dataset.collated(),
-    #                          dataset.collated().y(),
+    #                          dataset.stoi(),
+    #                          dataset.stoi().y(),
     #                          cv=5,
     #                          scoring=ScoringWrapper(scoring),
     #                          error_score='raise',
@@ -121,12 +104,13 @@ def run_grid_search(net, callbacks_names, dataset, cross_validator, **kwargs):
 
     # Grid search:
     grid_params = h.build_grid_params(callbacks_names=callbacks_names,
-                                      cross_validator=cross_validator,
+                                      cross_validator=5,
                                       **kwargs)
     gs = GridSearchCV(net, **grid_params)
     log(gs)
 
     # Fit:
+    dataset = dataset.stoi()
     gs.fit(dataset.X(), dataset.y())
 
     # Output:

@@ -29,7 +29,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--mode", "grid", "--n_jobs", "2"]
+            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "True", "--mode", "grid", "--n_jobs", "1"]
         },
         {
             "name": "Grid - GRU",
@@ -47,7 +47,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--mode", "train", "--n_jobs", "2"]
+            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "True", "--mode", "train", "--n_jobs", "2"]
         },
         {
             "name": "Train - LSTM",

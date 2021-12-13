@@ -62,7 +62,7 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
 
     # Iterators args:
     iterators_args = {
-        # "collate_fn": dataset.collate,
+        "collate_fn": collate_data,
         # "num_workers": 4,
         # "shuffle": True
     }
@@ -141,6 +141,7 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
         _grid_args = filter_by_keys(kwargs, keys_to_filter=KEYS_FOR_GRID)
 
         # Scoring:
+        # _scoring = scoring
         _scoring = ScoringWrapper(scoring)
 
         return {
@@ -261,6 +262,22 @@ def __unpack_dataset(ds):
         return None
 
 
+def collate_data(data):
+    X, y = zip(*data)
+    X, _ = zip(*X)
+    X, X_lengths = zip(*X)
+
+    # X = torch.stack(X)
+    # X_lengths = torch.stack(X_lengths)
+    # y = torch.stack(y)
+
+    X = torch.tensor(X, dtype=torch.long)
+    X_lengths = torch.tensor(X_lengths, dtype=torch.long)
+    y = torch.tensor(y, dtype=torch.long)
+
+    return {"X": X, "lengths": X_lengths, "y": y}, y
+
+
 def format_dir(dir, **kwargs):
     return normpath(dir.format(**kwargs)) if dir is not None else ''
 
@@ -346,7 +363,8 @@ def balance_dataset(dataset, seed):
         return {k: smooth_v(v, u, sign) for (k, v) in data.items()}
 
     # Original data:
-    X, y = dataset.X(fmt="array"), dataset.y(fmt="array")
+    # X, y = dataset.X(fmt="array"), dataset.y(fmt="array")
+    X, y = dataset.X(), dataset.y()
     original = Counter(y)
 
     # Compute samplings:
@@ -376,8 +394,9 @@ class ScoringWrapper:
         self.scorer = get_scorer(score_func)
 
     def __call__(self, estimator, X, y_true, sample_weight=None):
-        if isinstance(y_true, AslSliceDataset):
-            y_true = y_true.collated().cpu()
+        if isinstance(X, AslSliceDataset):
+            # y_true = y_true.collated().cpu()
+            X = X.dataset[X.indices]
         return self.scorer(estimator, X, y_true, sample_weight)
 
     def __repr__(self):
