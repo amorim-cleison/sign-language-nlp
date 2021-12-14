@@ -41,18 +41,22 @@ dataset_args:
     handshape_ndh, 
     # mouth_openness
   ]
-  samples_min_freq: 2   # How many samples for the label should exist in dataset for the label to be considered?
+  samples_min_freq: 5   # How many samples for the label should exist in dataset for the label to be considered?
   composition_strategy: as_words
   reuse_transient: False
+  balance_dataset: True
 
 # Training:
 training_args:
-  max_epochs: 1000 # Original: 100
+  max_epochs: 100 # Original: 100
   batch_size: 50
   lr: 0.01
-  test_size: 0.2
+  test_size: 0.1
+  valid_size: 0.2
   early_stopping:
-    patience: 50
+    patience: 10
+    threshold: 1e-4
+    threshold_mode: abs
   gradient_clipping:
     gradient_clip_value: 0.5
   lr_scheduler: 

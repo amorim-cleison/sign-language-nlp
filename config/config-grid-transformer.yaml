@@ -47,7 +47,7 @@ dataset_args:
   ]
   samples_min_freq: 5   # How many samples for the label should exist in dataset for the label to be considered?
   composition_strategy: as_words
-  reuse_transient: True
+  reuse_transient: False
   balance_dataset: True
 
 # Training:
