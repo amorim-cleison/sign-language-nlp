@@ -8,14 +8,32 @@ scoring: accuracy
 verbose: 3
 n_jobs: -1
 
+# Model:
 model: model.Transformer
+model_args:
+  input_size: 512
+  hidden_size: 2048
+  num_layers: 6
+  dropout: 0.1
+  num_heads: 8
+
+# Criterion:
+criterion: torch.nn.CrossEntropyLoss
+
+# Optimizer:
 # optimizer: torch.optim.Adam
 optimizer: torch.optim.SGD
-criterion: torch.nn.CrossEntropyLoss
-# cv: sklearn.model_selection.StratifiedShuffleSplit
-cv: Null
-# cv: sklearn.model_selection.ShuffleSplit
+optimizer_args:
+  # SGD ---
+  nesterov: False
+  # momentum: 0
+  # dampening: 0
+  # weight_decay: 0
+  # ADAM ---
+  # betas: [0.9, 0.98]
+  # eps: 10e-9 
 
+# Dataset:
 dataset_args:
   dataset_dir: ../../work/dataset/asl-phono/phonology/3d
   fields: [
@@ -32,32 +50,13 @@ dataset_args:
   reuse_transient: True
   balance_dataset: True
 
-model_args:
-  input_size: 512
-  hidden_size: 2048
-  num_layers: 6
-  dropout: 0.1
-  num_heads: 8
-
-optimizer_args:
-  # SGD ---
-  nesterov: False
-  # momentum: 0
-  # dampening: 0
-  # weight_decay: 0
-  # ADAM ---
-  # betas: [0.9, 0.98]
-  # eps: 10e-9 
-
-cv_args:
-  n_splits: 10
-  test_size: 0.15
-
+# Training:
 training_args:
   max_epochs: 10 # Original: 100
   batch_size: 50
   lr: 0.05
   test_size: 0.1
+  valid_size: 0.2
   early_stopping:
     patience: 10
     threshold: 1e-4
@@ -69,7 +68,9 @@ training_args:
     factor: 0.95
     patience: 1
 
+# Grid search:
 grid_args:
+  cv: 5
   training_args:
     batch_size: [50, 128]
     lr: [0.5, 0.05]
