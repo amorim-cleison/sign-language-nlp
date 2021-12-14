@@ -7,7 +7,6 @@ from skorch import NeuralNetClassifier
 import helper as h
 from args import ARGUMENTS
 from dataset import AslDataset
-from helper import ScoringWrapper
 
 
 def run(args):
@@ -46,7 +45,6 @@ def run(args):
                                     dataset=dataset,
                                     cross_validator=cross_validator,
                                     **args)
-
     net = NeuralNetClassifier(**net_params)
 
     # Train:

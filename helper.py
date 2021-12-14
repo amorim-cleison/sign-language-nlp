@@ -10,7 +10,7 @@ from skorch.callbacks import (Checkpoint, EarlyStopping, EpochScoring,
                               GradientNormClipping, LoadInitState, LRScheduler)
 from skorch.dataset import CVSplit
 
-from dataset import AslSliceDataset
+from dataset import AslDataset
 
 
 def setup_seed(seed, **kwargs):
@@ -29,9 +29,9 @@ def prepare_device(cuda):
 
 
 def build_net_params(training_args, model_args, model, optimizer, criterion,
-                     mode, resumable, callbacks, callbacks_names, device,
-                     dataset, optimizer_args, criterion_args, cross_validator,
-                     **kwargs):
+                     mode, callbacks, callbacks_names, device, dataset,
+                     optimizer_args, criterion_args, cross_validator,
+                     dataset_args, **kwargs):
     # Configure params:
     train_split = cross_validator if is_cv_for_net(cross_validator) else None
 
@@ -86,6 +86,7 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
         "criterion": locate(criterion),
         "callbacks": callbacks,
         "train_split": train_split,
+        "dataset": AslDataset,
         **_net_args,
         **_module_args,
         **_optimizer_args,
@@ -140,15 +141,11 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
         ]
         _grid_args = filter_by_keys(kwargs, keys_to_filter=KEYS_FOR_GRID)
 
-        # Scoring:
-        # _scoring = scoring
-        _scoring = ScoringWrapper(scoring)
-
         return {
             "refit": True,
             "cv": cross_validator,
             "verbose": verbose,
-            "scoring": _scoring,
+            "scoring": scoring,
             "n_jobs": n_jobs,
             "error_score": "raise",
             **_grid_args, "param_grid": {
@@ -264,17 +261,15 @@ def __unpack_dataset(ds):
 
 def collate_data(data):
     X, y = zip(*data)
-    X, _ = zip(*X)
-    X, X_lengths = zip(*X)
 
-    # X = torch.stack(X)
-    # X_lengths = torch.stack(X_lengths)
-    # y = torch.stack(y)
+    if len(X[0]) == 3:
+        X, X_lengths, _ = zip(*X)
+    elif len(X[0]) == 2:
+        X, X_lengths = zip(*X)
 
     X = torch.tensor(X, dtype=torch.long)
     X_lengths = torch.tensor(X_lengths, dtype=torch.long)
     y = torch.tensor(y, dtype=torch.long)
-
     return {"X": X, "lengths": X_lengths, "y": y}, y
 
 
@@ -285,11 +280,6 @@ def format_dir(dir, **kwargs):
 def filter_by_keys(map, keys_to_filter, not_in=False):
     return dict(
         filter(lambda o: not (o[0] in keys_to_filter) == not_in, map.items()))
-
-
-def get_processed(dataset, field):
-    data = [getattr(x, field) for x in dataset]
-    return dataset.fields[field].process(data)
 
 
 def get_cross_validator(cv,
@@ -363,7 +353,6 @@ def balance_dataset(dataset, seed):
         return {k: smooth_v(v, u, sign) for (k, v) in data.items()}
 
     # Original data:
-    # X, y = dataset.X(fmt="array"), dataset.y(fmt="array")
     X, y = dataset.X(), dataset.y()
     original = Counter(y)
 
@@ -382,7 +371,7 @@ def balance_dataset(dataset, seed):
 
     # Resample data:
     X_res, y_res = pipeline.fit_resample(X, y)
-    dataset_res = AslDataset(dataset=dataset, data=(X_res, y_res))
+    dataset_res = AslDataset(dataset=dataset, X=X_res, y=y_res)
 
     return dataset_res
 
@@ -394,9 +383,6 @@ class ScoringWrapper:
         self.scorer = get_scorer(score_func)
 
     def __call__(self, estimator, X, y_true, sample_weight=None):
-        if isinstance(X, AslSliceDataset):
-            # y_true = y_true.collated().cpu()
-            X = X.dataset[X.indices]
         return self.scorer(estimator, X, y_true, sample_weight)
 
     def __repr__(self):
