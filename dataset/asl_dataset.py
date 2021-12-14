@@ -28,7 +28,7 @@ class AslDataset(Dataset):
             batch_first = dataset.__batch_first
 
             if X is None:
-                X, y = dataset.__X, dataset.__y
+                X, y = dataset.__data
             elif isinstance(X, Dataset):
                 X, y = zip(*X)
 
