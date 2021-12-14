@@ -30,10 +30,11 @@ def prepare_device(cuda):
 
 def build_net_params(training_args, model_args, model, optimizer, criterion,
                      mode, callbacks, callbacks_names, device, dataset,
-                     optimizer_args, criterion_args, cross_validator,
-                     dataset_args, **kwargs):
-    # Configure params:
-    train_split = cross_validator if is_cv_for_net(cross_validator) else None
+                     optimizer_args, criterion_args, **kwargs):
+    # Train-split:
+    assert ("valid_size"
+            in training_args), "`valid_size` is a required parameter"
+    train_split = CVSplit(training_args["valid_size"])
 
     # Callbacks args:
     _callbacks_args = build_callbacks_args(model=model,
@@ -98,14 +99,14 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
 
 
 def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
-                      cross_validator, verbose, n_jobs, **kwargs):
+                      verbose, n_jobs, **kwargs):
     def unpack(callbacks_names,
                model,
                workdir,
-               cross_validator,
                scoring,
                verbose,
                n_jobs,
+               cv,
                training_args={},
                model_args={},
                optimizer_args={},
@@ -143,7 +144,7 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
 
         return {
             "refit": True,
-            "cv": cross_validator,
+            "cv": cv,
             "verbose": verbose,
             "scoring": scoring,
             "n_jobs": n_jobs,
@@ -160,25 +161,21 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
     return unpack(callbacks_names=callbacks_names,
                   model=model,
                   workdir=workdir,
-                  cross_validator=cross_validator,
                   scoring=scoring,
                   verbose=verbose,
                   n_jobs=n_jobs,
                   **grid_args)
 
 
-def build_callbacks(model,
-                    mode,
+def build_callbacks(mode,
                     workdir,
                     resumable,
                     scoring,
-                    cross_validator,
                     early_stopping=None,
                     gradient_clipping=None,
                     lr_scheduler=None,
                     **kwargs):
-    # Cross-validator:
-    has_valid = is_cv_for_net(cross_validator)
+    has_valid = True
     monitor = "valid" if has_valid else "train"
 
     # Callbacks:
@@ -238,25 +235,11 @@ def build_callbacks(model,
     return callbacks, callbacks_names
 
 
-def build_callbacks_args(callbacks_names,
-                         workdir,
-                         ensure_list=False,
-                         **kwargs):
+def build_callbacks_args(callbacks_names, ensure_list=False, **kwargs):
     __standard_callbacks = ["print_log"]
     callbacks_args = filter_by_keys(kwargs,
                                     callbacks_names + __standard_callbacks)
     return prefix_args("callbacks", ensure_list=ensure_list, **callbacks_args)
-
-
-def __unpack_dataset(ds):
-    from dataset import AslDataset
-
-    if isinstance(ds, AslDataset):
-        return ds
-    elif hasattr(ds, 'dataset'):
-        return __unpack_dataset(ds.dataset)
-    else:
-        return None
 
 
 def collate_data(data):
@@ -280,31 +263,6 @@ def format_dir(dir, **kwargs):
 def filter_by_keys(map, keys_to_filter, not_in=False):
     return dict(
         filter(lambda o: not (o[0] in keys_to_filter) == not_in, map.items()))
-
-
-def get_cross_validator(cv,
-                        cv_args,
-                        seed,
-                        dataset=None,
-                        training_args={},
-                        **kwargs):
-    if cv:
-        _cv_cls = locate(cv)
-
-        if "shuffle" in kwargs:
-            cv_args["random_state"] = seed
-        return _cv_cls(**cv_args)
-    elif dataset:
-        assert (
-            "test_size"
-            in training_args), "You must inform `test_size` in training_args."
-        test_size = training_args["test_size"]
-        test_idxs, train_idxs = dataset.split(test_size,
-                                              indices_only=True,
-                                              seed=seed)
-        return iter([(train_idxs, test_idxs)])
-    return None
-
 
 def is_cv_for_net(cross_validator):
     return isinstance(cross_validator, (int, float, CVSplit))

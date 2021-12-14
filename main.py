@@ -10,6 +10,7 @@ from dataset import AslDataset
 
 
 def run(args):
+    # Workdir:
     args["workdir"] = h.format_dir(args["workdir"], **args)
 
     # Seed:
@@ -29,53 +30,35 @@ def run(args):
         dataset = h.balance_dataset(dataset=dataset, seed=args["seed"])
     log(f"{len(dataset)} entries of data")
 
-    # Cross-validator:
-    # cross_validator = h.get_cross_validator(dataset=dataset, **args)
-    from skorch.dataset import CVSplit
-    cross_validator = CVSplit(5)
-
     # Callbacks:
-    callbacks, callbacks_names = h.build_callbacks(
-        cross_validator=cross_validator, **args, **args["training_args"])
+    callbacks, callbacks_names = h.build_callbacks(**args,
+                                                   **args["training_args"])
 
     # Classifier:
     net_params = h.build_net_params(callbacks=callbacks,
                                     callbacks_names=callbacks_names,
                                     device=device,
                                     dataset=dataset,
-                                    cross_validator=cross_validator,
                                     **args)
     net = NeuralNetClassifier(**net_params)
 
     # Train:
     if args["mode"] == "train":
-        run_training(net=net,
-                     dataset=dataset,
-                     cross_validator=cross_validator,
-                     **args,
-                     **args["training_args"])
+        run_training(net=net, dataset=dataset, **args, **args["training_args"])
 
     # Grid search:
     elif args["mode"] == "grid":
         run_grid_search(net=net,
                         callbacks_names=callbacks_names,
                         dataset=dataset,
-                        cross_validator=cross_validator,
                         **args)
 
 
-def run_training(net, dataset, cross_validator, scoring, n_jobs, **kwargs):
-    run_training_cv(net=net,
-                    dataset=dataset,
-                    cross_validator=cross_validator,
-                    scoring=scoring,
-                    n_jobs=n_jobs)
+def run_training(net, dataset, test_size, **kwargs):
+    log("Training...")
 
-
-def run_training_cv(net, dataset, cross_validator, scoring, n_jobs):
-    log(f"Training ({cross_validator})...")
-
-    test, train = dataset.stoi().split(0.2, indices_only=False)
+    dataset = dataset.stoi()
+    test, train = dataset.split(test_size, indices_only=False)
 
     # Fit:
     net.fit(train, train.y().cpu())
@@ -84,25 +67,12 @@ def run_training_cv(net, dataset, cross_validator, scoring, n_jobs):
     score = net.score(test, test.y().cpu())
     log(f"Test score: {score:.4f}")
 
-    # Cross-validation:
-    # scores = cross_val_score(net,
-    #                          dataset.stoi(),
-    #                          dataset.stoi().y(),
-    #                          cv=5,
-    #                          scoring=ScoringWrapper(scoring),
-    #                          error_score='raise',
-    #                          n_jobs=n_jobs)
 
-    # log(f"'{scoring.capitalize()}': {[f'{x:.3f}' for x in scores]}")
-    # log(f"AVG '{scoring}': {scores.mean():.3f}")
-
-
-def run_grid_search(net, callbacks_names, dataset, cross_validator, **kwargs):
+def run_grid_search(net, callbacks_names, dataset, **kwargs):
     log("Grid search...")
 
     # Grid search:
     grid_params = h.build_grid_params(callbacks_names=callbacks_names,
-                                      cross_validator=5,
                                       **kwargs)
     gs = GridSearchCV(net, **grid_params)
     log(gs)

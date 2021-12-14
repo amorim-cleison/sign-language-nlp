@@ -32,9 +32,15 @@ class AslDataset(Dataset):
             elif isinstance(X, Dataset):
                 X, y = zip(*X)
 
-        elif isinstance(X, SliceDataset):
-            _X, _y = zip(*(X.dataset[i] for i in X.indices))
-            self.__init__(dataset=X.dataset,
+        elif isinstance(X, SliceDataset) or isinstance(y, SliceDataset):
+            if isinstance(X, SliceDataset):
+                dataset = X.dataset
+                indices = X.indices
+            else:
+                dataset = y.dataset
+                indices = y.dataset
+            _X, _y = zip(*(dataset[i] for i in indices))
+            self.__init__(dataset=dataset,
                           X=_X,
                           y=_y,
                           batch_first=batch_first,
