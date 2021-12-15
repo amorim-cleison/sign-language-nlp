@@ -67,10 +67,15 @@ class RNNModel(nn.Module):
         nn.init.zeros_(self.linear.bias)
         nn.init.uniform_(self.linear.weight, -initrange, initrange)
 
-    def forward(self, X, lengths=None, hidden=None, **kwargs):
+    def forward(self, X, lengths=None, **kwargs):
         if lengths is None:
             lengths = util.resolve_lengths(X, self.src_vocab)
 
+        # Hidden:
+        batch_size = X.size(0) if self.batch_first else X.size(1)
+        hidden = self.init_hidden(batch_size)
+
+        # Embedding:
         output = self.encoder(X)
 
         # Pack:
@@ -81,20 +86,23 @@ class RNNModel(nn.Module):
 
         # Forward:
         output = self._forward_rnn(output, hidden)
+
+        # Unpack:
+        output, _ = t.pad_packed_sequence(sequence=output,
+                                          batch_first=self.batch_first)
+        output = output[:, -1, :] if self.batch_first else output[-1, :, :]
+
+        # Other layers:
         output = self.drop(output)
         output = self.linear(output)
         output = self.softmax(output, dim=-1)
         return output
 
     def _forward_rnn(self, input, hidden):
-        output, hidden = self.rnn(input, hidden)
-        return hidden[-1]
+        output, _ = self.rnn(input, hidden)
+        return output
 
     def init_hidden(self, batch_size):
         weight = next(self.parameters())
         dims = (self.num_layers, batch_size, self.hidden_size)
-
-        if self.batch_first:
-            dims = dims.permute(1, 0)
-
         return weight.new_zeros(*dims).to(self.device)
