@@ -262,3 +262,24 @@ class AslSliceDataset(SliceDataset):
                                idx=self.idx,
                                indices=self.indices,
                                cpu=True)
+
+    @property
+    def dtype(self):
+        return type(self[0])
+
+    def to_array(self):
+        import numpy as np
+
+        def parse(x):
+            if isinstance(x, (tuple, list, SliceDataset)):
+                first = x[0]
+
+                if isinstance(first, (tuple, list)):
+                    return np.asarray([parse(xi) for xi in x],
+                                      dtype=type(first))
+                else:
+                    return np.asarray(x)
+            else:
+                return x
+
+        return parse(self[self.indices_])

@@ -264,6 +264,7 @@ def filter_by_keys(map, keys_to_filter, not_in=False):
     return dict(
         filter(lambda o: not (o[0] in keys_to_filter) == not_in, map.items()))
 
+
 def is_cv_for_net(cross_validator):
     return isinstance(cross_validator, (int, float, CVSplit))
 
@@ -311,7 +312,7 @@ def balance_dataset(dataset, seed):
         return {k: smooth_v(v, u, sign) for (k, v) in data.items()}
 
     # Original data:
-    X, y = dataset.X(), dataset.y()
+    X, y = dataset.X().to_array(), dataset.y().to_array()
     original = Counter(y)
 
     # Compute samplings:

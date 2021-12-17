@@ -20,7 +20,7 @@ def run(args):
     device = h.prepare_device(args["cuda"])
 
     # Dataset:
-    dataset = AslDataset(device=device, batch_first=True, **args)
+    dataset = AslDataset(device=device, batch_first=True, **args).stoi()
 
     if args["debug"]:
         dataset = dataset.truncated(1000)
@@ -57,7 +57,6 @@ def run(args):
 def run_training(net, dataset, test_size, **kwargs):
     log("Training...")
 
-    dataset = dataset.stoi()
     test, train = dataset.split(test_size, indices_only=False)
 
     # Fit:
@@ -78,7 +77,6 @@ def run_grid_search(net, callbacks_names, dataset, **kwargs):
     log(gs)
 
     # Fit:
-    dataset = dataset.stoi()
     gs.fit(dataset.X(), dataset.y())
 
     # Output:
