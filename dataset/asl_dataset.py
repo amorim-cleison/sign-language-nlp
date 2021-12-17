@@ -35,10 +35,10 @@ class AslDataset(Dataset):
         elif isinstance(X, SliceDataset) or isinstance(y, SliceDataset):
             if isinstance(X, SliceDataset):
                 dataset = X.dataset
-                indices = X.indices
+                indices = X.indices_
             else:
                 dataset = y.dataset
-                indices = y.dataset
+                indices = y.indices_
             _X, _y = zip(*(dataset[i] for i in indices))
             self.__init__(dataset=dataset,
                           X=_X,
