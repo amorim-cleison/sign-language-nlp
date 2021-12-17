@@ -47,7 +47,7 @@ dataset_args:
   ]
   samples_min_freq: 5   # How many samples for the label should exist in dataset for the label to be considered?
   composition_strategy: as_words
-  reuse_transient: False
+  reuse_transient: True
   balance_dataset: True
 
 # Training:
@@ -55,8 +55,8 @@ training_args:
   max_epochs: 100 # Original: 100
   batch_size: 50
   lr: 0.05
-  test_size: 0.1
-  valid_size: 0.2
+  test_size: 0.15
+  valid_size: 0.15
   early_stopping:
     patience: 10
     threshold: 1e-4
@@ -73,7 +73,7 @@ grid_args:
   cv: 5
   training_args:
     batch_size: [50, 128]
-    lr: [0.5, 0.05]
+    lr: [0.1, 0.01]
   # model_args:
   #   input_size: [64, 128, 256, 512]
   #   hidden_size: [128, 256, 512, 1024, 2048]
