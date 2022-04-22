@@ -76,6 +76,8 @@ def run_grid_search(net, callbacks_names, dataset, **kwargs):
     gs = GridSearchCV(net, **grid_params)
     log(gs)
 
+    # FIXME: add support to RandomizedSearchCV
+
     # Fit:
     gs.fit(dataset.X(), dataset.y())
 
