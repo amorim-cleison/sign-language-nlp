@@ -10,9 +10,6 @@ from dataset import AslDataset
 
 
 def run(args):
-    # Workdir:
-    args["workdir"] = h.format_dir(args["workdir"], **args)
-
     # Seed:
     h.setup_seed(**args)
 
@@ -104,4 +101,10 @@ def should_balance_dataset(args):
 
 if __name__ == "__main__":
     args = vars(load_args('SL Transformer', ARGUMENTS))
+    args["workdir"] = h.format_dir(args["workdir"], **args)
+
+    # Dump args:
+    h.dump_args(args)
+
+    # Run:
     run(args)
