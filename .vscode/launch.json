@@ -13,6 +13,8 @@
             "justMyCode": false,
             "args": ["-c", "config/config-grid-lstm.yaml", "--debug", "False"]
         },
+
+        // GRID SEARCH:
         {
             "name": "Grid - LSTM",
             "type": "python",
@@ -20,7 +22,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "False","--mode", "grid"]
+            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "False","--mode", "grid", "--scoring", "f1_weighted", "--n_jobs", "-1"]
         },
         {
             "name": "Grid - Transformer",
@@ -29,7 +31,7 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "True", "--mode", "grid", "--n_jobs", "1"]
+            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "True", "--mode", "grid", "--scoring", "f1_weighted", "--n_jobs", "-1"]
         },
         {
             "name": "Grid - GRU",
@@ -38,8 +40,10 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-gru.yaml", "--cuda", "False", "--debug", "False", "--mode", "grid"]
+            "args": ["-c", "config/config-grid-gru.yaml", "--cuda", "False", "--debug", "False", "--mode", "grid", "--scoring", "f1_weighted", "--n_jobs", "-1"]
         },
+
+        // TRAINING:
         {
             "name": "Train - Transformer",
             "type": "python",
@@ -50,15 +54,6 @@
             "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--mode", "train"]
         },
         {
-            "name": "(Debug) Train - Transformer",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "True", "--mode", "train", "--n_jobs", "2"]
-        },
-        {
             "name": "Train - LSTM",
             "type": "python",
             "request": "launch",
@@ -67,5 +62,17 @@
             "justMyCode": false,
             "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "False", "--mode", "train"]
         },
+
+        // (DEBUG) TRAINING
+        {
+            "name": "(Debug) Train - Transformer",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "True", "--mode", "train", "--n_jobs", "2"]
+        },
+       
     ]
 }
