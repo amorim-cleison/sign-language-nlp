@@ -219,15 +219,18 @@ def build_callbacks(mode,
                                       **lr_scheduler)))
 
     # Scoring metric (dynamic):
-    if (not has_valid) or (scoring != "accuracy"):
-        _score = ScoringWrapper(scoring)
+    if not isinstance(scoring, list):
+        scoring = [scoring]
+
+    for score in scoring:
+        wrapper = ScoringWrapper(score)
 
         callbacks.append(
-            ("score",
-             EpochScoring(scoring=_score,
-                          name=f"{monitor}_{scoring}",
+            (f"score_{score}",
+             EpochScoring(scoring=wrapper,
+                          name=f"{monitor}_{score}",
                           on_train=not has_valid,
-                          lower_is_better=not _score.greater_is_better)))
+                          lower_is_better=not wrapper.greater_is_better)))
 
     # Callbacks names:
     callbacks_names = [c[0] for c in callbacks]
@@ -340,6 +343,8 @@ class ScoringWrapper:
         from sklearn.metrics import get_scorer
         self._score_func = score_func
         self.scorer = get_scorer(score_func)
+        # FIXME: add support to externalize scoring kwargs/options:
+        self.scorer._kwargs["zero_division"] = 0
 
     def __call__(self, estimator, X, y_true, sample_weight=None):
         return self.scorer(estimator, X, y_true, sample_weight)
