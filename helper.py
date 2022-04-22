@@ -4,7 +4,7 @@ from pydoc import locate
 import numpy as np
 import torch
 from commons.log import log
-from commons.util import normpath, save_args
+from commons.util import normpath, save_args, create_if_missing
 from sklearn.model_selection import *
 from skorch.callbacks import (Checkpoint, EarlyStopping, EpochScoring,
                               GradientNormClipping, LoadInitState, LRScheduler)
@@ -29,7 +29,9 @@ def prepare_device(cuda):
 
 
 def dump_args(args):
-    save_args(args, normpath(f"{args['workdir']}/config.yaml"))
+    _dir = args['workdir']
+    create_if_missing(_dir)
+    save_args(args, normpath(f"{_dir}/config.yaml"))
 
 
 def build_net_params(training_args, model_args, model, optimizer, criterion,
