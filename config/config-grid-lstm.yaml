@@ -4,28 +4,27 @@ seed: 1
 mode: grid
 resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
-scoring: accuracy
+scoring: [precision_macro, recall_macro, f1_macro, precision_weighted, recall_weighted, f1_weighted]
 verbose: 3
 n_jobs: -1
 
 # Model:
-model: model.LSTM
+model: model.LSTMNew
 model_args:
-  input_size: 512
-  hidden_size: 1866
+  input_size: 28
+  hidden_size: 100
   num_layers: 2
-  dropout: 0.2
+  dropout: 0.5
 
 # Criterion:
 criterion: torch.nn.CrossEntropyLoss
 
 # Optimizer:
-# optimizer: torch.optim.Adam
 optimizer: torch.optim.SGD
 optimizer_args:
   # SGD ---
   nesterov: False
-  # momentum: 0
+  momentum: 0.9
   # dampening: 0
   # weight_decay: 0
 
@@ -41,16 +40,16 @@ dataset_args:
     handshape_ndh, 
     # mouth_openness
   ]
-  samples_min_freq: 3   # How many samples for the label should exist in dataset for the label to be considered?
+  samples_min_freq: 2   # How many samples for the label should exist in dataset for the label to be considered?
   composition_strategy: as_words
   reuse_transient: True
   balance_dataset: True
 
 # Training:
 training_args:
-  max_epochs: 100 # Original: 100
+  max_epochs: 10 # Original: 100
   batch_size: 50
-  lr: 0.05
+  lr: 0.01
   test_size: 0.15
   valid_size: 0.15
   early_stopping:
@@ -61,18 +60,16 @@ training_args:
     gradient_clip_value: 0.5
   lr_scheduler: 
     policy: ReduceLROnPlateau
-    factor: 0.95
-    patience: 1
+    factor: 0.2
+    patience: 5
 
 # Grid search:
 grid_args:
   cv: 5
   training_args:
-    batch_size: [50, 128]
-    lr: [0.1, 0.01]
-  # model_args:
-  #   input_size: [16, 64, 128, 512]
-  #   hidden_size: [32, 256, 1024]
-  #   num_layers: [2, 6, 10]
-  #   dropout: [0.0, 0.1, 0.3]
-    
+    lr: 0.1
+  model_args:
+    input_size: [10, 50, 100]
+    hidden_size: [50, 200, 500]
+    num_layers: 2
+  

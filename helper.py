@@ -55,6 +55,7 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
                                batch_first=dataset.batch_first,
                                src_vocab=dataset.vocab_X,
                                tgt_vocab=dataset.vocab_y,
+                               device=device,
                                **model_args)
 
     # Module args:
