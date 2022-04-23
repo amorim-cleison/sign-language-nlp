@@ -11,13 +11,13 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.batch_first = batch_first
+        self.src_vocab = src_vocab
 
-        self.src_ntoken = len(src_vocab)
-        self.tgt_ntoken = len(tgt_vocab)
         src_pad_idx = util.get_pad_idx(src_vocab)
 
         # Layers
-        self.embedding = nn.Embedding(num_embeddings=self.src_ntoken,
+        self.embedding = nn.Embedding(num_embeddings=len(src_vocab),
                                       embedding_dim=input_size,
                                       padding_idx=src_pad_idx)
         self.rnn = nn.LSTM(input_size=input_size,
@@ -33,6 +33,8 @@ class Encoder(nn.Module):
         embedded = self.dropout(self.embedding(src))
         # embedded = [src len, batch size, emb dim]
 
+        embedded = self.pack(embedded, src)  # Pack
+
         outputs, hidden = self.rnn(embedded)
         # outputs = [src len, batch size, hid dim * n directions]
         # hidden = [n layers * n directions, batch size, hid dim]
@@ -42,6 +44,28 @@ class Encoder(nn.Module):
 
         return hidden
 
+    def pack(self, output, X=None, lengths=None):
+        import torch.nn.utils.rnn as t
+
+        assert (X is not None) or (
+            output is not None), "One of `X` or `output` should be informed."
+
+        if lengths is None:
+            lengths = util.resolve_lengths(X, self.src_vocab)
+
+        return t.pack_padded_sequence(input=output,
+                                      lengths=lengths.cpu(),
+                                      batch_first=self.batch_first,
+                                      enforce_sorted=False)
+
+    def unpack(self, output):
+        import torch.nn.utils.rnn as t
+
+        unpacked, _ = t.pad_packed_sequence(sequence=output,
+                                            batch_first=self.batch_first)
+        return unpacked
+
+
 
 class Decoder(nn.Module):
     def __init__(self, output_size, hidden_size, num_layers, dropout,
@@ -49,13 +73,14 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.output_size = output_size
         self.hidden_size = hidden_size
+        self.batch_first = batch_first
         self.num_layers = num_layers
+        self.src_vocab = src_vocab
+        self.tgt_vocab = tgt_vocab
 
-        self.src_ntoken = len(src_vocab)
-        self.tgt_ntoken = len(tgt_vocab)
         src_pad_idx = util.get_pad_idx(src_vocab)
 
-        self.embedding = nn.Embedding(num_embeddings=self.tgt_ntoken,
+        self.embedding = nn.Embedding(num_embeddings=len(tgt_vocab),
                                       embedding_dim=output_size,
                                       padding_idx=src_pad_idx)
         self.rnn = nn.LSTM(input_size=output_size,
@@ -64,7 +89,7 @@ class Decoder(nn.Module):
                            dropout=dropout,
                            batch_first=batch_first)
         self.fc_out = nn.Linear(in_features=hidden_size,
-                                out_features=self.tgt_ntoken)
+                                out_features=len(tgt_vocab))
         self.dropout = nn.Dropout(dropout)
         self.softmax = nn.LogSoftmax(dim=-1)
 
@@ -83,10 +108,14 @@ class Decoder(nn.Module):
         embedded = self.dropout(self.embedding(input))
         # embedded = [1, batch size, emb dim]
 
+        embedded = self.pack(embedded, input)  # Pack
+
         output, hidden = self.rnn(embedded, hidden)
         # output = [seq len, batch size, hid dim * n directions]
         # hidden = [n layers * n directions, batch size, hid dim]
         # cell = [n layers * n directions, batch size, hid dim]
+
+        output = self.unpack(output)  # Unpack
 
         # seq len and n directions will always be 1 in the decoder, therefore:
         # output = [1, batch size, hid dim]
@@ -99,6 +128,27 @@ class Decoder(nn.Module):
         prediction = self.softmax(prediction)
 
         return prediction, hidden
+
+    def pack(self, output, X=None, lengths=None):
+        import torch.nn.utils.rnn as t
+
+        assert (X is not None) or (
+            output is not None), "One of `X` or `output` should be informed."
+
+        if lengths is None:
+            lengths = util.resolve_lengths(X, self.src_vocab)
+
+        return t.pack_padded_sequence(input=output,
+                                      lengths=lengths.cpu(),
+                                      batch_first=self.batch_first,
+                                      enforce_sorted=False)
+
+    def unpack(self, output):
+        import torch.nn.utils.rnn as t
+
+        unpacked, _ = t.pad_packed_sequence(sequence=output,
+                                            batch_first=self.batch_first)
+        return unpacked
 
 
 class Seq2SeqLSTM(nn.Module):
@@ -143,7 +193,10 @@ class Seq2SeqLSTM(nn.Module):
 
         # first input to the decoder is the <sos> tokens
         # input = y  # y[0, :]
-        input = X[:, -1]
+        # input = X[:, -1]
+
+        from dataset.constant import BOS_WORD
+        input = torch.full([batch_size], self.src_vocab.stoi[BOS_WORD]).to(self.device)
 
         for t in range(0, y_len):  # range(1, y_len):
             # insert input token embedding, previous hidden and previous cell states
