@@ -11,6 +11,7 @@ from skorch.callbacks import (Checkpoint, EarlyStopping, EpochScoring,
 from skorch.dataset import CVSplit
 
 from dataset import AslDataset
+import model.util as util
 
 
 def setup_seed(seed, **kwargs):
@@ -37,6 +38,9 @@ def dump_args(args):
 def build_net_params(training_args, model_args, model, optimizer, criterion,
                      mode, callbacks, callbacks_names, device, dataset,
                      optimizer_args, criterion_args, **kwargs):
+    src_vocab = dataset.vocab_X
+    tgt_vocab = dataset.vocab_y
+
     # Train-split:
     assert ("valid_size"
             in training_args), "`valid_size` is a required parameter"
@@ -53,8 +57,8 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
     _module_args = prefix_args("module",
                                ensure_list=False,
                                batch_first=dataset.batch_first,
-                               src_vocab=dataset.vocab_X,
-                               tgt_vocab=dataset.vocab_y,
+                               src_vocab=src_vocab,
+                               tgt_vocab=tgt_vocab,
                                device=device,
                                **model_args)
 
@@ -64,6 +68,7 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
                                   **optimizer_args)
 
     # Criterion args:
+    criterion_args["ignore_index"] = util.get_pad_idx(tgt_vocab)
     _criterion_args = prefix_args("criterion",
                                   ensure_list=False,
                                   **criterion_args)
