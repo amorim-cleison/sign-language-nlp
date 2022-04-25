@@ -8,14 +8,30 @@ scoring: [precision_macro, recall_macro, f1_macro, precision_weighted, recall_we
 verbose: 3
 n_jobs: -1
 
+
+# minfreq   entries | srcvocab  tgtvocab  | input   output  hidden  layers  | loss (train)  f1 (weighted)
+# 2         1245    | 19687     2286      | 1024    1024    2048    2       | ?        @15
+# 2         11232*  | 19687     2286      | 1024    1024    2048    2       | 5.7700        0.0437        @15
+#                                                                           > 1.2420        0.3300        @57
+
 # Model:
 model: model.Seq2SeqLSTM
 model_args:
-  input_size: 256
-  output_size: 256
-  hidden_size: 512
+  input_size: 1024
+  output_size: 1024
+  hidden_size: 2048
   num_layers: 2
   dropout: 0.5
+  # min_freq = 2
+  #   len(src_vocab) = 19687
+  #   len(tgt_vocab) = 2286
+  #   entries(debug) = 1245
+  #   entries(n-debug) = 11232
+  # min_freq = 5
+  #   len(src_vocab) = 10271
+  #   len(tgt_vocab) = 670
+  #   entries(debug) = 1231
+  #   entries(n-debug) = 5656
 
 # Criterion:
 criterion: torch.nn.CrossEntropyLoss
@@ -48,15 +64,15 @@ dataset_args:
 
 # Training:
 training_args:
-  max_epochs: 10 # Original: 100
+  max_epochs: 100 # Original: 100
   batch_size: 50
-  lr: 0.01
+  lr: 0.1
   test_size: 0.15
   valid_size: 0.15
   early_stopping:
-    patience: 10
+    patience: 20
     threshold: 1e-4
-    threshold_mode: abs
+    threshold_mode: rel  # abs
   gradient_clipping:
     gradient_clip_value: 0.5
   lr_scheduler: 

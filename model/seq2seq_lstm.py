@@ -66,7 +66,6 @@ class Encoder(nn.Module):
         return unpacked
 
 
-
 class Decoder(nn.Module):
     def __init__(self, output_size, hidden_size, num_layers, dropout,
                  src_vocab, tgt_vocab, batch_first):
@@ -176,48 +175,54 @@ class Seq2SeqLSTM(nn.Module):
         self.apply(self.init_weights)
 
     def forward(self, X, y, teacher_forcing_ratio=0.5, **kwargs):
+        src, tgt = X, y
+
+        tgt = tgt if tgt.ndim > 1 else tgt.unsqueeze(-1)
+
         # X = [X len, batch size]
         # y = [y len, batch size]
         # teacher_forcing_ratio is probability to use teacher forcing
         # e.g. if teacher_forcing_ratio is 0.75 we use ground-truth inputs 75% of the time
 
-        batch_size = self.get_batch_size(X)  # y.shape[1]
-        y_len = 1  #y.shape[0]
-        y_vocab_size = len(self.tgt_vocab)  # self.decoder.output_size
+        batch_size = self.get_batch_size(src)  # y.shape[1]
+        tgt_len = tgt.shape[1]  #y.shape[0]
+        tgt_vocab_size = len(self.tgt_vocab)  # self.decoder.output_size
 
         # tensor to store decoder outputs
-        outputs = torch.zeros(batch_size, y_len, y_vocab_size).to(self.device)
+        outputs = torch.zeros(batch_size, tgt_len,
+                              tgt_vocab_size).to(self.device)
 
         # last hidden state of the encoder is used as the initial hidden state of the decoder
-        hidden = self.encoder(X)
+        hidden = self.encoder(src)
 
         # first input to the decoder is the <sos> tokens
         # input = y  # y[0, :]
-        # input = X[:, -1]
-
         from dataset.constant import BOS_WORD
-        input = torch.full([batch_size], self.src_vocab.stoi[BOS_WORD]).to(self.device)
+        BOS_IDX = self.tgt_vocab.stoi[BOS_WORD]
+        BOS_TENSOR = torch.full((batch_size, ), BOS_IDX).to(self.device)
+        input = BOS_TENSOR
 
-        for t in range(0, y_len):  # range(1, y_len):
+        for t in range(0, tgt_len):  # range(1, tgt_len):
             # insert input token embedding, previous hidden and previous cell states
             # receive output tensor (predictions) and new hidden and cell states
             output, hidden = self.decoder(input, hidden)
 
             # place predictions in a tensor holding predictions for each token
-            # outputs[:, t] = output
-            outputs = output
+            outputs[:, t] = output
+            # outputs = output
 
             # # decide if we are going to use teacher forcing or not
-            # teacher_force = random.random() < teacher_forcing_ratio
+            teacher_force = random.random() < teacher_forcing_ratio
 
             # # get the highest predicted token from our predictions
-            # top1 = output.argmax(1)
+            top1 = output.argmax(dim=-1)
 
             # # if teacher forcing, use actual next token as next input
             # # if not, use predicted token
-            # input = y[t] if teacher_force else top1
+            input = tgt[:, t] if teacher_force else top1
 
-        return outputs
+        # return outputs
+        return self.get_last_time_step(outputs)
 
     def init_weights(self, model):
         for name, param in model.named_parameters():
@@ -228,3 +233,6 @@ class Seq2SeqLSTM(nn.Module):
 
     def get_batch_size(self, X):
         return X.size(0) if self.batch_first else X.size(1)
+
+    def get_last_time_step(self, output):
+        return output[:, -1, :] if self.batch_first else output[-1, :, :]

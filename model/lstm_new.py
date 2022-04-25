@@ -30,7 +30,8 @@ class LSTMNew(nn.Module):
         self.lstm = nn.LSTM(input_size=input_size,
                             hidden_size=hidden_size,
                             num_layers=num_layers,
-                            batch_first=batch_first)
+                            batch_first=batch_first,
+                            dropout=dropout)
         self.drop = nn.Dropout(dropout)
         self.linear = nn.Linear(in_features=hidden_size,
                                 out_features=len(tgt_vocab))
