@@ -17,6 +17,7 @@ def run(args):
     device = h.prepare_device(args["cuda"])
 
     # Dataset:
+    # h.save_stats_datasets(device, args)
     dataset = AslDataset(device=device, batch_first=True, **args).stoi()
 
     if args["debug"]:

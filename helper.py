@@ -314,7 +314,7 @@ def balance_dataset(dataset, seed):
 
     from dataset import AslDataset
 
-    def compute_sampling(data, mode="under"):
+    def compute_sampling(data, u, mode="under"):
         def smooth_v(v, u, sign):
             tmp = round(u + math.log(v))
             return v if (v * sign) > (tmp * sign) else tmp
@@ -322,17 +322,17 @@ def balance_dataset(dataset, seed):
         _signs = {"under": -1, "over": +1}
         assert (mode in _signs), "Invalid mode"
 
-        u = mean(data.values())
         sign = _signs[mode]
         return {k: smooth_v(v, u, sign) for (k, v) in data.items()}
 
     # Original data:
     X, y = dataset.X().to_array(), dataset.y().to_array()
     original = Counter(y)
+    u = mean(original.values())
 
     # Compute samplings:
-    under_sampling = compute_sampling(original, "under")
-    over_sampling = compute_sampling(under_sampling, "over")
+    under_sampling = compute_sampling(original, u, "under")
+    over_sampling = compute_sampling(under_sampling, u, "over")
 
     # Prepare pipeline:
     rus = RandomUnderSampler(sampling_strategy=under_sampling,
@@ -348,6 +348,21 @@ def balance_dataset(dataset, seed):
     dataset_res = AslDataset(dataset=dataset, X=X_res, y=y_res)
 
     return dataset_res
+
+
+def save_stats_datasets(device, args):
+    from collections import Counter
+    from commons.util import save_json
+
+    ds = AslDataset(device=device, batch_first=True, **args)
+    labels = ds._AslDataset__data[:][1]
+    cnt = Counter(labels)
+    save_json(dict(cnt), "./tmp.json")
+
+    ds_bal = balance_dataset(dataset=ds, seed=args["seed"])
+    labels_bal = ds_bal._AslDataset__data[:][1]
+    cnt_bal = Counter(labels_bal)
+    save_json(dict(cnt_bal), "./tmp_bal.json")
 
 
 class ScoringWrapper:
