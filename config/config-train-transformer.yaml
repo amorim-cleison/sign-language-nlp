@@ -56,7 +56,7 @@ training_args:
   early_stopping:
     patience: 10
     threshold: 1e-4
-    threshold_mode: abs
+    threshold_mode: rel
   gradient_clipping:
     gradient_clip_value: 0.5
   lr_scheduler: 
