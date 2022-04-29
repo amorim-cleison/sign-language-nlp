@@ -6,9 +6,11 @@ import model.util as util
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, dropout, src_vocab,
-                 tgt_vocab, batch_first):
+    def __init__(self, input_size, embedding_size, hidden_size, num_layers,
+                 dropout, src_vocab, tgt_vocab, batch_first):
         super(Encoder, self).__init__()
+        self.input_size = input_size
+        self.embedding_size = embedding_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.batch_first = batch_first
@@ -17,10 +19,10 @@ class Encoder(nn.Module):
         src_pad_idx = util.get_pad_idx(src_vocab)
 
         # Layers
-        self.embedding = nn.Embedding(num_embeddings=len(src_vocab),
-                                      embedding_dim=input_size,
+        self.embedding = nn.Embedding(num_embeddings=input_size,
+                                      embedding_dim=embedding_size,
                                       padding_idx=src_pad_idx)
-        self.rnn = nn.LSTM(input_size=input_size,
+        self.rnn = nn.LSTM(input_size=embedding_size,
                            hidden_size=hidden_size,
                            num_layers=num_layers,
                            dropout=dropout,
@@ -67,10 +69,11 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, output_size, hidden_size, num_layers, dropout,
-                 src_vocab, tgt_vocab, batch_first):
+    def __init__(self, output_size, embedding_size, hidden_size, num_layers,
+                 dropout, src_vocab, tgt_vocab, batch_first):
         super(Decoder, self).__init__()
         self.output_size = output_size
+        self.embedding_size = embedding_size
         self.hidden_size = hidden_size
         self.batch_first = batch_first
         self.num_layers = num_layers
@@ -79,16 +82,16 @@ class Decoder(nn.Module):
 
         src_pad_idx = util.get_pad_idx(src_vocab)
 
-        self.embedding = nn.Embedding(num_embeddings=len(tgt_vocab),
-                                      embedding_dim=output_size,
+        self.embedding = nn.Embedding(num_embeddings=output_size,
+                                      embedding_dim=embedding_size,
                                       padding_idx=src_pad_idx)
-        self.rnn = nn.LSTM(input_size=output_size,
+        self.rnn = nn.LSTM(input_size=embedding_size,
                            hidden_size=hidden_size,
                            num_layers=num_layers,
                            dropout=dropout,
                            batch_first=batch_first)
         self.fc_out = nn.Linear(in_features=hidden_size,
-                                out_features=len(tgt_vocab))
+                                out_features=self.output_size)
         self.dropout = nn.Dropout(dropout)
         self.softmax = nn.LogSoftmax(dim=-1)
 
@@ -152,19 +155,24 @@ class Decoder(nn.Module):
 
 class Seq2SeqLSTM(nn.Module):
     # def __init__(self, encoder, decoder, device):
-    def __init__(self, input_size, output_size, hidden_size, num_layers,
-                 dropout, src_vocab, tgt_vocab, batch_first, device):
+    def __init__(self, embedding_size, hidden_size, num_layers, dropout,
+                 src_vocab, tgt_vocab, batch_first, device):
         super(Seq2SeqLSTM, self).__init__()
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
         self.batch_first = batch_first
 
+        input_size = len(src_vocab)
+        output_size = len(tgt_vocab)
+
         # self.encoder = encoder
         # self.decoder = decoder
-        self.encoder = Encoder(input_size, hidden_size, num_layers, dropout,
-                               src_vocab, tgt_vocab, batch_first)
-        self.decoder = Decoder(output_size, hidden_size, num_layers, dropout,
-                               src_vocab, tgt_vocab, batch_first)
+        self.encoder = Encoder(input_size, embedding_size, hidden_size,
+                               num_layers, dropout, src_vocab, tgt_vocab,
+                               batch_first)
+        self.decoder = Decoder(output_size, embedding_size, hidden_size,
+                               num_layers, dropout, src_vocab, tgt_vocab,
+                               batch_first)
         self.device = device
 
         # assert self.encoder.hidden_size == self.decoder.hidden_size, \

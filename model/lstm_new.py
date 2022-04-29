@@ -5,7 +5,7 @@ import model.util as util
 
 class LSTMNew(nn.Module):
     def __init__(self,
-                 input_size,
+                 embedding_size,
                  hidden_size,
                  num_layers,
                  src_vocab,
@@ -14,20 +14,21 @@ class LSTMNew(nn.Module):
                  batch_first=False,
                  **kwargs):
         super(LSTMNew, self).__init__()
-        self.input_size = input_size
+        self.embedding_size = embedding_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.batch_first = batch_first
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
 
+        input_size = len(src_vocab)
         src_pad_idx = util.get_pad_idx(src_vocab)
 
         # Layers
-        self.embedding = nn.Embedding(num_embeddings=len(src_vocab),
-                                      embedding_dim=input_size,
+        self.embedding = nn.Embedding(num_embeddings=input_size,
+                                      embedding_dim=embedding_size,
                                       padding_idx=src_pad_idx)
-        self.lstm = nn.LSTM(input_size=input_size,
+        self.lstm = nn.LSTM(input_size=embedding_size,
                             hidden_size=hidden_size,
                             num_layers=num_layers,
                             batch_first=batch_first,

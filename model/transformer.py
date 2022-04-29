@@ -8,7 +8,7 @@ from .util import generate_mask, generate_padding_mask
 
 class Transformer(nn.Module):
     def __init__(self,
-                 input_size,
+                 embedding_size,
                  num_heads,
                  num_layers,
                  hidden_size,
@@ -20,30 +20,31 @@ class Transformer(nn.Module):
                  **kwargs):
         super(Transformer, self).__init__()
         self.model_type = 'Transformer'
-        self.input_size = input_size
+        self.embedding_size = embedding_size
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
         self.device = device
         self.batch_first = batch_first
-        src_ntoken = len(src_vocab)
-        tgt_ntoken = len(tgt_vocab)
 
-        self.src_embedding = nn.Embedding(num_embeddings=src_ntoken,
-                                          embedding_dim=input_size)
-        self.src_pos_encoding = PositionalEncoding(d_model=input_size,
+        input_size = len(src_vocab)
+        output_size = len(tgt_vocab)
+
+        self.src_embedding = nn.Embedding(num_embeddings=input_size,
+                                          embedding_dim=embedding_size)
+        self.src_pos_encoding = PositionalEncoding(d_model=embedding_size,
                                                    dropout=dropout)
-        self.tgt_embedding = nn.Embedding(num_embeddings=tgt_ntoken,
-                                          embedding_dim=input_size)
-        self.tgt_pos_encoding = PositionalEncoding(d_model=input_size,
+        self.tgt_embedding = nn.Embedding(num_embeddings=output_size,
+                                          embedding_dim=embedding_size)
+        self.tgt_pos_encoding = PositionalEncoding(d_model=embedding_size,
                                                    dropout=dropout)
-        self.transformer = nn.Transformer(d_model=input_size,
+        self.transformer = nn.Transformer(d_model=embedding_size,
                                           nhead=num_heads,
                                           num_encoder_layers=num_layers,
                                           num_decoder_layers=num_layers,
                                           dim_feedforward=hidden_size,
                                           dropout=dropout)
-        self.linear = nn.Linear(in_features=input_size,
-                                out_features=tgt_ntoken)
+        self.linear = nn.Linear(in_features=embedding_size,
+                                out_features=output_size)
         self.softmax = nn.functional.log_softmax
 
     def to(self, device):
@@ -103,6 +104,6 @@ class Transformer(nn.Module):
         return data
 
     def forward_embedding(self, x, embedding, pos_encoding):
-        x = embedding(x) * math.sqrt(self.input_size)
+        x = embedding(x) * math.sqrt(self.embedding_size)
         x = pos_encoding(x)
         return x
