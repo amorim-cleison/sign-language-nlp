@@ -71,8 +71,8 @@ class Encoder(nn.Module):
 
 
 class AttentionDecoder(nn.Module):
-    def __init__(self, output_size, hidden_size, num_layers,
-                 dropout, src_vocab, tgt_vocab, batch_first):
+    def __init__(self, output_size, hidden_size, num_layers, dropout,
+                 src_vocab, tgt_vocab, batch_first):
         super(AttentionDecoder, self).__init__()
         self.output_size = output_size
         self.hidden_size = hidden_size
@@ -115,7 +115,10 @@ class AttentionDecoder(nn.Module):
         embedded = self.dropout(self.embedding(input))
         # embedded = [1, batch size, emb dim]
 
-        output, attn_weights = self.attention(embedded, context)
+        # output, attn_weights = self.attention(embedded, context)
+        output, attn_weights = self.attention(embedded,
+                                              hidden[0].transpose(0, 1))
+
         # attn_weights = self.softmax(self.attn(
         #     torch.cat((embedded[:, 0, :], hidden[0][-1, :, :]), 1)))
         # attn_applied = torch.bmm(attn_weights.unsqueeze(0).transpose(0, 1),
@@ -170,15 +173,8 @@ class AttentionDecoder(nn.Module):
 class Seq2SeqLSTMAttn(nn.Module):
 
     # def __init__(self, encoder, decoder, device):
-    def __init__(self,
-                 embedding_size,
-                 hidden_size,
-                 num_layers,
-                 dropout,
-                 src_vocab,
-                 tgt_vocab,
-                 batch_first,
-                 device):
+    def __init__(self, embedding_size, hidden_size, num_layers, dropout,
+                 src_vocab, tgt_vocab, batch_first, device):
         super(Seq2SeqLSTMAttn, self).__init__()
         self.src_vocab = src_vocab
         self.tgt_vocab = tgt_vocab
@@ -193,7 +189,7 @@ class Seq2SeqLSTMAttn(nn.Module):
                                num_layers, dropout, src_vocab, tgt_vocab,
                                batch_first)
         self.decoder = AttentionDecoder(output_size, hidden_size, num_layers,
-                                        dropout, src_vocab, tgt_vocab, 
+                                        dropout, src_vocab, tgt_vocab,
                                         batch_first)
         self.device = device
 

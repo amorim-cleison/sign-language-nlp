@@ -9,8 +9,13 @@ verbose: 3
 n_jobs: -1
 
 
-# minfreq   entries | srcvocab  tgtvocab  | embedding_size  hidden  layers  | loss (train)  f1 (weighted)
-# 2         12142*  | 19687     2286      | 1024            2048    2       | ?        @15
+# minfreq   entries | srcvocab  tgtvocab  | embedding_size  hidden  layers  dropout | loss (train)  f1 (weighted)
+# 2         12142*  | 19687     2286      | 1024            2048    2       0.5     | 0.2505        0.4567        @33
+#                                                                                   > 0.0397        0.4867        @48
+# 2         12142*  | 19687     2286      | 512             2048    2       0.5     | 0.0040        0.4524        @124
+
+# (after fixing attention inputs)
+# 2         12142*  | 19687     2286      | 1024            2048    2       0.1     | ?        @?
 
 
 # Model:
@@ -19,7 +24,7 @@ model_args:
   embedding_size: 1024
   hidden_size: 2048
   num_layers: 2
-  dropout: 0.5
+  dropout: 0.1
   # min_freq = 2
   #   len(src_vocab) = 19687
   #   len(tgt_vocab) = 2286

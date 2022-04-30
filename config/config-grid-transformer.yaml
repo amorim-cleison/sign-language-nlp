@@ -8,6 +8,9 @@ scoring: f1_weighted
 verbose: 3
 n_jobs: -1
 
+# minfreq   entries | srcvocab  tgtvocab  | embedding_size  hidden  layers  | loss (train)  f1 (weighted)
+# 2         12142*  | 19687     2286      | 512             2048    6       | 0.0005        1.0000        @309
+
 # Model:
 model: model.Transformer
 model_args:
