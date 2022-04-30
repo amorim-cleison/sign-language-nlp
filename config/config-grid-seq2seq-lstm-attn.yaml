@@ -9,8 +9,8 @@ verbose: 3
 n_jobs: -1
 
 
-# minfreq   entries | srcvocab  tgtvocab  | input   output  hidden  layers  | loss (train)  f1 (weighted)
-# 2         12142*  | 19687     2286      | 1024    1024    2048    2       | ?        @15
+# minfreq   entries | srcvocab  tgtvocab  | embedding_size  hidden  layers  | loss (train)  f1 (weighted)
+# 2         12142*  | 19687     2286      | 1024            2048    2       | ?        @15
 
 
 # Model:
