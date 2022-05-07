@@ -183,6 +183,7 @@ def build_callbacks(mode,
                     workdir,
                     resumable,
                     scoring,
+                    dataset,
                     early_stopping=None,
                     gradient_clipping=None,
                     lr_scheduler=None,
@@ -234,8 +235,10 @@ def build_callbacks(mode,
     if not isinstance(scoring, list):
         scoring = [scoring]
 
+    labels = dataset.labels()
+
     for score in scoring:
-        wrapper = ScoringWrapper(score)
+        wrapper = ScoringWrapper(score, labels)
 
         callbacks.append(
             (f"score_{score}",
@@ -366,12 +369,15 @@ def save_stats_datasets(device, args):
 
 
 class ScoringWrapper:
-    def __init__(self, score_func):
+    def __init__(self, score_func, labels=None):
         from sklearn.metrics import get_scorer
         self._score_func = score_func
         self.scorer = get_scorer(score_func)
         # FIXME: add support to externalize scoring kwargs/options:
-        self.scorer._kwargs["zero_division"] = 0
+        if (score_func == 'neg_log_loss'):
+            self.scorer._kwargs["labels"] = labels
+        else:
+            self.scorer._kwargs["zero_division"] = 0
 
     def __call__(self, estimator, X, y_true, sample_weight=None):
         return self.scorer(estimator, X, y_true, sample_weight)

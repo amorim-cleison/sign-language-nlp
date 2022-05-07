@@ -4,7 +4,7 @@ seed: 1
 mode: grid
 resumable: False
 workdir: '../../work/sl-transformer/checkpoint/{model}/{mode}'
-scoring: f1_weighted
+scoring: neg_log_loss
 verbose: 3
 n_jobs: -1
 

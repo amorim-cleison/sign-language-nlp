@@ -29,7 +29,8 @@ def run(args):
     log(f"{len(dataset)} entries of data")
 
     # Callbacks:
-    callbacks, callbacks_names = h.build_callbacks(**args,
+    callbacks, callbacks_names = h.build_callbacks(dataset=dataset,
+                                                   **args,
                                                    **args["training_args"])
 
     # Classifier:

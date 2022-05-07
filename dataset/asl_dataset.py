@@ -194,6 +194,11 @@ class AslDataset(Dataset):
                           y=self.y(),
                           vocab_fmt="stoi")
 
+    def labels(self, fmt="i"):
+        fmts = {"i": self.vocab_y.stoi.values, "s": self.vocab_y.stoi.keys}
+        assert (fmt in fmts), "Unknown format"
+        return list(fmts[fmt]())
+
     def truncated(self, length):
         X = self.__data[self.IDX_X][:length]
         y = self.__data[self.IDX_Y][:length]
