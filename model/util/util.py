@@ -1,12 +1,14 @@
 import torch
-from dataset.constant import PAD_WORD
+from dataset.constant import PAD_WORD, BOS_WORD
 
 
 def get_pad_idx(vocab):
     return vocab.stoi[PAD_WORD]
 
+def get_bos_idx(vocab):
+    return vocab.stoi[BOS_WORD]
 
-def generate_mask(data):
+def generate_mask(data, batch_first=False):
     """
     Mask ensures that position i is allowed to attend the unmasked
     positions. If a ByteTensor is provided, the non-zero positions are
@@ -29,7 +31,13 @@ def generate_mask(data):
             mask == 1, float(0.0))
         return mask
 
-    mask = generate_square_subsequent_mask(data.size(0))
+    features_dim = 1 if batch_first else 0
+
+    if data.ndim == 1:
+        data = data.unsqueeze(features_dim)
+
+    size = data.size(features_dim)
+    mask = generate_square_subsequent_mask(size)
     mask = (mask != float(0.0)).bool()
     return mask
 
@@ -55,4 +63,7 @@ def generate_padding_mask(data, vocab):
 
 def resolve_lengths(data, vocab, dim=-1):
     pad_idx = get_pad_idx(vocab)
+
+    if (data.ndim < 2):
+        data = data.unsqueeze(dim)
     return data.size(dim) - data.eq(pad_idx).sum(dim=dim)

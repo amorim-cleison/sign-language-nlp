@@ -16,31 +16,22 @@
 
         // GRID SEARCH:
         {
-            "name": "Grid - LSTM",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "True","--mode", "grid", "--scoring", "f1_weighted", "--n_jobs", "7"]
-        },
-        {
             "name": "Grid - Transformer",
             "type": "python",
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "True", "--mode", "grid", "--scoring", "f1_weighted", "--n_jobs", "-1"]
+            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--n_jobs", "-1"]
         },
         {
-            "name": "Grid - GRU",
+            "name": "Grid - Enc-Dec GRU Attn",
             "type": "python",
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-gru.yaml", "--cuda", "False", "--debug", "False", "--mode", "grid", "--scoring", "f1_weighted", "--n_jobs", "-1"]
+            "args": ["-c", "config/config-grid-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "False", "--n_jobs", "-1"]
         },
 
         // TRAINING:
@@ -51,35 +42,18 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--mode", "train"]
+            "args": ["-c", "config/config-train-transformer.yaml", "--cuda", "False", "--debug", "False"]
         },
         {
-            "name": "Train - LSTM",
+            "name": "Train - Enc-Dec GRU Attn",
             "type": "python",
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "False", "--mode", "train"]
+            "args": ["-c", "config/config-train-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "False"]
         },
-        {
-            "name": "Train - Seq2Seq LSTM",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-grid-seq2seq-lstm.yaml", "--cuda", "False", "--debug", "False", "--mode", "train"]
-        },
-        {
-            "name": "Train - Seq2Seq LSTM Attn",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-grid-seq2seq-lstm-attn.yaml", "--cuda", "False", "--debug", "False", "--mode", "train"]
-        },
+       
 
         // (DEBUG) TRAINING
         {
@@ -89,34 +63,16 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "True", "--mode", "train", "--n_jobs", "2"]
+            "args": ["-c", "config/config-train-transformer.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "2"]
         },
         {
-            "name": "(Debug) Train - LSTM",
+            "name": "(Debug) Train - Enc-Dec GRU Attn",
             "type": "python",
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-lstm.yaml", "--cuda", "False", "--debug", "True", "--mode", "train", "--n_jobs", "7"]
-        },
-        {
-            "name": "(Debug) Train - Seq2Seq LSTM",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-grid-seq2seq-lstm.yaml", "--cuda", "False", "--debug", "True", "--mode", "train", "--n_jobs", "2"]
-        },
-        {
-            "name": "(Debug) Train - Seq2Seq LSTM Attn",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-grid-seq2seq-lstm-attn.yaml", "--cuda", "False", "--debug", "True", "--mode", "train", "--n_jobs", "2"]
+            "args": ["-c", "config/config-train-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "2"]
         },
     ]
 }
