@@ -3,7 +3,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH --mem=16G
-#SBATCH --output=grid-search-transformer.out
+#SBATCH --output=grid-enc-dec-gru-attn.out
 
 # Aqui o comando de execução de seu programa.
 module load cuda-10.2-gcc-8.3.0-nxzzh52
