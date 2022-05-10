@@ -106,7 +106,7 @@ class Encoder(nn.Module):
         x should have dimensions [batch, time, dim].
         """
         packed = pack_padded_sequence(X,
-                                      lengths,
+                                      lengths.cpu(),
                                       batch_first=True,
                                       enforce_sorted=False)
         output, final = self.rnn(packed)
@@ -345,5 +345,6 @@ class EncoderDecoderGruAttn(nn.Module):
     def prepend_bos(self, data, vocab):
         batch_size = data.size(0)
         data = data.unsqueeze(1)
-        BOS_TENSOR = torch.full((batch_size, 1), util.get_bos_idx(vocab))
-        return torch.cat([BOS_TENSOR, data], dim=1)
+        bos_idx = util.get_bos_idx(vocab)
+        bos_data = torch.full((batch_size, 1), bos_idx).to(self.device)
+        return torch.cat([bos_data, data], dim=1)
