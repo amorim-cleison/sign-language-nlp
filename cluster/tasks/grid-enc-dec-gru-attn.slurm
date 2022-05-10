@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=GR-TRNSF
+#SBATCH --job-name=GR-EDGRUA
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH --mem=16G
