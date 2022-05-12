@@ -1,20 +1,20 @@
 debug: False
 cuda: True
 seed: 1
-mode: train
+mode: grid
 resumable: False
 workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
-scoring: [precision_macro, recall_macro, f1_macro, precision_weighted, recall_weighted, f1_weighted]
+scoring: neg_log_loss
 verbose: 3
 n_jobs: -1
 
 # Model:
-model: model.EncoderDecoderGRUAttn
+model: model.EncoderDecoderLSTMAttn
 model_args:
-  embedding_size: 512
+  embedding_size: 1024
   hidden_size: 2048
   num_layers: 2
-  dropout: 0.5
+  dropout: 0.1
 
 # Criterion:
 criterion: torch.nn.CrossEntropyLoss
@@ -47,9 +47,9 @@ dataset_args:
 
 # Training:
 training_args:
-  max_epochs: 1000 # Original: 100
+  max_epochs: 50 # Original: 100
   batch_size: 50
-  lr: 0.1
+  lr: 0.01
   test_size: 0.15
   valid_size: 0.15
   early_stopping:
@@ -64,8 +64,12 @@ training_args:
     patience: 5
 
 # Grid search:
-# grid_args:
-#   cv: 5
-#   training_args:
-#     lr: [0.1, 0.01, 0.001, 0.0001]
-  
+grid_args:
+  cv: 5
+  training_args:
+    lr: [0.1, 0.01, 0.001, 0.0001]
+  model_args:
+    embedding_size: [256, 1024]
+    hidden_size: [512, 2048]
+    num_layers: [2, 4]
+    dropout: [0.1, 0.5]

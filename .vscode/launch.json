@@ -53,6 +53,15 @@
             "justMyCode": false,
             "args": ["-c", "config/config-train-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "False"]
         },
+        {
+            "name": "Train - Enc-Dec LSTM Attn",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-train-enc-dec-lstm-attn.yaml", "--cuda", "False", "--debug", "False"]
+        },
        
 
         // (DEBUG) TRAINING
@@ -73,6 +82,15 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": ["-c", "config/config-train-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "2"]
+        },
+        {
+            "name": "(Debug) Train - Enc-Dec LSTM Attn",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-train-enc-dec-lstm-attn.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "2"]
         },
     ]
 }
