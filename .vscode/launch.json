@@ -31,7 +31,16 @@
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "False", "--n_jobs", "-1"]
+            "args": ["-c", "config/config-grid-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "False", "--n_jobs", "7"]
+        },
+        {
+            "name": "Grid - Enc-Dec LSTM Attn",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-grid-enc-dec-lstm-attn.yaml", "--cuda", "False", "--debug", "False", "--n_jobs", "-1"]
         },
 
         // TRAINING:
