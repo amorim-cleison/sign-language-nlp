@@ -130,7 +130,7 @@ dmypy.json
 
 # Custom files:
 .data
-
+cluster/**/*.out
 
 # Poetry:
 poetry.lock
