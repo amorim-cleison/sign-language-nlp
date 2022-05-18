@@ -71,6 +71,7 @@ def run_grid_search(net, callbacks_names, dataset, **kwargs):
 
     # Grid search:
     grid_params = h.build_grid_params(callbacks_names=callbacks_names,
+                                      dataset=dataset,
                                       **kwargs)
     gs = GridSearchCV(net, **grid_params)
     log(gs)

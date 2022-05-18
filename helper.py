@@ -111,13 +111,14 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
 
 
 def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
-                      verbose, n_jobs, **kwargs):
+                      verbose, n_jobs, dataset, **kwargs):
     def unpack(callbacks_names,
                model,
                workdir,
                scoring,
                verbose,
                n_jobs,
+               dataset,
                cv,
                training_args={},
                model_args={},
@@ -154,11 +155,15 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
         ]
         _grid_args = filter_by_keys(kwargs, keys_to_filter=KEYS_FOR_GRID)
 
+        # Scoring:
+        labels = dataset.labels()
+        _scoring_wrapper = build_scoring(scoring, labels, allow_multiple=False)
+
         return {
             "refit": True,
             "cv": cv,
             "verbose": verbose,
-            "scoring": scoring,
+            "scoring": _scoring_wrapper,
             "n_jobs": n_jobs,
             "error_score": "raise",
             **_grid_args, "param_grid": {
@@ -176,6 +181,7 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
                   scoring=scoring,
                   verbose=verbose,
                   n_jobs=n_jobs,
+                  dataset=dataset,
                   **grid_args)
 
 
@@ -236,14 +242,13 @@ def build_callbacks(mode,
         scoring = [scoring]
 
     labels = dataset.labels()
+    scoring_wrappers = build_scoring(scoring, labels, allow_multiple=True)
 
-    for score in scoring:
-        wrapper = ScoringWrapper(score, labels)
-
+    for wrapper in scoring_wrappers:
         callbacks.append(
-            (f"score_{score}",
+            (f"score_{wrapper.score}",
              EpochScoring(scoring=wrapper,
-                          name=f"{monitor}_{score}",
+                          name=f"{monitor}_{wrapper.score}",
                           on_train=not has_valid,
                           lower_is_better=not wrapper.greater_is_better)))
 
@@ -251,6 +256,16 @@ def build_callbacks(mode,
     callbacks_names = [c[0] for c in callbacks]
 
     return callbacks, callbacks_names
+
+
+def build_scoring(scoring, labels=None, allow_multiple=True):
+    if not isinstance(scoring, list):
+        scoring = [scoring]
+    wrappers = [ScoringWrapper(score, labels) for score in scoring]
+
+    if not allow_multiple:
+        wrappers = wrappers[0]
+    return wrappers
 
 
 def build_callbacks_args(callbacks_names, ensure_list=False, **kwargs):
@@ -388,3 +403,7 @@ class ScoringWrapper:
     @property
     def greater_is_better(self):
         return (self.scorer._sign == 1)
+
+    @property
+    def score(self):
+        return self._score_func
