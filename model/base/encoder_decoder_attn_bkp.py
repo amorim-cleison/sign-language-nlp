@@ -103,46 +103,67 @@ class Encoder(nn.Module):
                              num_layers=num_layers,
                              batch_first=True,
                              bidirectional=True,
-                             dropout=dropout)
+                             dropout=dropout if num_layers > 1 else 0.)
 
     def forward(self, X, mask, lengths, vocab):
         """
-        Applies a bidirectional GRU to sequence of embeddings x.
+        Applies a bidirectional RNN to sequence of embeddings x.
         The input mini-batch x needs to be sorted by length.
         x should have dimensions [batch, time, dim].
         """
+        total_length = X.size(1)
+        padding_value = util.get_pad_idx(vocab)
+
         packed = pack_padded_sequence(X,
                                       lengths.cpu(),
                                       batch_first=True,
                                       enforce_sorted=False)
-        output, final = self.rnn(packed)
+        output, hidden = self.rnn(packed)
         # output, _ = pad_packed_sequence(output, batch_first=True)
+
+        if isinstance(hidden, tuple):
+            hidden, memory_cell = hidden
+
         output, _ = pad_packed_sequence(output,
                                         batch_first=True,
-                                        total_length=X.size(1),
-                                        padding_value=util.get_pad_idx(vocab))
+                                        total_length=total_length,
+                                        padding_value=padding_value)
 
         # we need to manually concatenate the final states for both directions
-        # fwd_final = final[0:final.size(0):2]
-        # bwd_final = final[1:final.size(0):2]
-        # final = torch.cat([fwd_final, bwd_final],
+        # fwd_hidden = hidden[0:hidden.size(0):2]
+        # bwd_hidden = hidden[1:hidden.size(0):2]
+        # hidden = torch.cat([fwd_hidden, bwd_hidden],
         #                   dim=2)  # [num_layers, batch, 2*dim]
-        final = self.concat_directions(final)
+        hidden_concat = self.concatenate_directions(hidden)
 
-        return output, final
+        return output, hidden_concat
 
-    def concat_directions(self, data):
-        def concat(data):
-            fwd_data = data[0:data.size(0):2]
-            bwd_data = data[1:data.size(0):2]
-            return torch.cat([fwd_data, bwd_data],
-                             dim=2)  # [num_layers, batch, 2*dim]
+    def concatenate_directions(self, hidden):
+        # # hidden: dir*layers x batch x hidden
+        # # output: batch x max_length x directions*hidden
+        # batch_size = hidden.size(1)
 
-        if isinstance(data, tuple):
-            hn, cn = data
-            return (concat(hn), concat(cn))
-        else:
-            return concat(data)
+        # # separate final hidden states by layer and direction
+        # hidden_layerwise = hidden.view(self.rnn.num_layers,
+        #                                2 if self.rnn.bidirectional else 1,
+        #                                batch_size, self.rnn.hidden_size)
+        # # final_layers: layers x directions x batch x hidden
+
+        # # concatenate the final states of the last layer for each directions
+        # # thanks to pack_padded_sequence final states don't include padding
+        # fwd_hidden_last = hidden_layerwise[-1:, 0]
+        # bwd_hidden_last = hidden_layerwise[-1:, 1]
+
+        # # only feed the final state of the top-most layer to the decoder
+        # hidden_concat = torch.cat(
+        #     [fwd_hidden_last, bwd_hidden_last], dim=2).squeeze(0)
+        # # final: batch x directions*hidden
+
+        fwd_hidden = hidden[0:hidden.size(0):2]
+        bwd_hidden = hidden[1:hidden.size(0):2]
+        hidden_concat = torch.cat([fwd_hidden, bwd_hidden],
+                                  dim=2)  # [num_layers, batch, 2*dim]
+        return hidden_concat
 
 
 class Decoder(nn.Module):
@@ -162,6 +183,8 @@ class Decoder(nn.Module):
         self.attention = attention
         self.dropout = dropout
 
+        # self.rnn_input_size = emb_size + hidden_size
+
         # self.rnn = nn.GRU(emb_size + 2 * hidden_size,
         #                   hidden_size,
         #                   num_layers,
@@ -171,7 +194,7 @@ class Decoder(nn.Module):
                              hidden_size=hidden_size,
                              num_layers=num_layers,
                              batch_first=True,
-                             dropout=dropout)
+                             dropout=dropout if num_layers > 1 else 0.)
 
         # to initialize from the final encoder state
         self.bridge = nn.Linear(2 * hidden_size, hidden_size,
@@ -205,14 +228,15 @@ class Decoder(nn.Module):
 
         return output, hidden, pre_output
 
-    def forward(self,
-                trg_embed,
-                encoder_hidden,
-                encoder_final,
-                src_mask,
-                trg_mask,
-                hidden=None,
-                max_len=None):
+    def forward(
+            self,
+            trg_embed,
+            encoder_hidden,  # encoder_output - hidden states from the encoder, shape (batch_size, src_length, encoder.output_size)
+            encoder_final,  # encoder_hidden - last state from the encoder, shape (batch_size, encoder.output_size)
+            src_mask,
+            trg_mask,
+            hidden=None,
+            max_len=None):
         """Unroll the decoder one step at a time."""
 
         # the maximum number of steps to unroll the RNN
@@ -234,9 +258,13 @@ class Decoder(nn.Module):
 
         # unroll the decoder RNN for max_len steps
         for i in range(max_len):
-            prev_embed = trg_embed[:, i].unsqueeze(1)
+            prev_embed = trg_embed[:, i].unsqueeze(1)  # batch, 1, emb
             output, hidden, pre_output = self.forward_step(
-                prev_embed, encoder_hidden, src_mask, proj_key, hidden)
+                prev_embed=prev_embed,
+                encoder_hidden=encoder_hidden,
+                src_mask=src_mask,
+                proj_key=proj_key,
+                hidden=hidden)
             decoder_states.append(output)
             pre_output_vectors.append(pre_output)
 
@@ -252,18 +280,17 @@ class Decoder(nn.Module):
             return None  # start with zeros
 
         # return torch.tanh(self.bridge(encoder_final))
-        if isinstance(encoder_final, tuple):
-            hn, cn = encoder_final
-            return (torch.tanh(self.bridge(hn)), torch.tanh(self.bridge(cn)))
-        else:
-            return torch.tanh(self.bridge(encoder_final))
+
+        hidden = torch.tanh(self.bridge(encoder_final))
+
+        if isinstance(self.rnn, nn.LSTM):
+            hidden = (hidden, hidden)
+        return hidden
 
     def get_query(self, hidden):
         if isinstance(hidden, tuple):
-            hn, _ = hidden
-        else:
-            hn = hidden
-        return hn[-1].unsqueeze(1)  # [#layers, B, D] -> [B, 1, D]
+            hidden, _ = hidden
+        return hidden[-1].unsqueeze(1)  # [#layers, B, D] -> [B, 1, D]
 
 
 class BahdanauAttention(nn.Module):
