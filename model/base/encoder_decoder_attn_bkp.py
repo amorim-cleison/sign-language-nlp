@@ -22,8 +22,6 @@ class EncoderDecoder(nn.Module):
                  src_embed,
                  trg_embed,
                  generator,
-                 src_vocab,
-                 tgt_vocab,
                  max_output_len=None):
         super(EncoderDecoder, self).__init__()
         self.encoder = encoder
@@ -31,27 +29,25 @@ class EncoderDecoder(nn.Module):
         self.src_embed = src_embed
         self.trg_embed = trg_embed
         self.generator = generator
-        self.src_vocab = src_vocab
-        self.tgt_vocab = tgt_vocab
         self.max_output_len = max_output_len
 
     def forward(self, src, trg, src_mask, trg_mask, src_lengths, trg_lengths):
         """Take in and process masked src and target sequences."""
         encoder_hidden, encoder_final = self.encode(src, src_mask, src_lengths,
-                                                    self.src_vocab)
+                                                    self.src_embed.padding_idx)
         # return self.decode(encoder_hidden, encoder_final, src_mask, trg,
         #                    trg_mask)
-        out, _, pre_output = self.decode(encoder_hidden,
-                                         encoder_final,
-                                         src_mask,
-                                         trg,
-                                         trg_mask,
-                                         max_len=self.max_output_len)
+        out, _, _ = self.decode(encoder_hidden,
+                                encoder_final,
+                                src_mask,
+                                trg,
+                                trg_mask,
+                                max_len=self.max_output_len)
         return self.generator(out)
 
-    def encode(self, src, src_mask, src_lengths, src_vocab):
+    def encode(self, src, src_mask, src_lengths, src_padding_idx):
         return self.encoder(self.src_embed(src), src_mask, src_lengths,
-                            src_vocab)
+                            src_padding_idx)
 
     def decode(self,
                encoder_hidden,
@@ -85,13 +81,11 @@ class Encoder(nn.Module):
     def __init__(self,
                  input_size,
                  hidden_size,
-                 vocab,
                  rnn_class,
                  num_layers=1,
                  dropout=0.):
         super(Encoder, self).__init__()
         self.num_layers = num_layers
-        self.vocab = vocab
         # self.rnn = nn.GRU(input_size,
         #                   hidden_size,
         #                   num_layers,
@@ -105,14 +99,13 @@ class Encoder(nn.Module):
                              bidirectional=True,
                              dropout=dropout if num_layers > 1 else 0.)
 
-    def forward(self, X, mask, lengths, vocab):
+    def forward(self, X, mask, lengths, padding_idx):
         """
         Applies a bidirectional RNN to sequence of embeddings x.
         The input mini-batch x needs to be sorted by length.
         x should have dimensions [batch, time, dim].
         """
         total_length = X.size(1)
-        padding_value = util.get_pad_idx(vocab)
 
         packed = pack_padded_sequence(X,
                                       lengths.cpu(),
@@ -127,7 +120,7 @@ class Encoder(nn.Module):
         output, _ = pad_packed_sequence(output,
                                         batch_first=True,
                                         total_length=total_length,
-                                        padding_value=padding_value)
+                                        padding_value=padding_idx)
 
         # we need to manually concatenate the final states for both directions
         # fwd_hidden = hidden[0:hidden.size(0):2]
@@ -201,10 +194,10 @@ class Decoder(nn.Module):
                                 bias=True) if bridge else None
 
         self.dropout_layer = nn.Dropout(p=dropout)
-        self.pre_output_layer = nn.Linear(hidden_size + 2 * hidden_size +
-                                          emb_size,
-                                          hidden_size,
-                                          bias=False)
+        self.pre_output_layer = nn.Linear(
+            (hidden_size + 2 * hidden_size + emb_size),
+            hidden_size,
+            bias=False)
 
     def forward_step(self, prev_embed, encoder_hidden, src_mask, proj_key,
                      hidden):
@@ -280,7 +273,6 @@ class Decoder(nn.Module):
             return None  # start with zeros
 
         # return torch.tanh(self.bridge(encoder_final))
-
         hidden = torch.tanh(self.bridge(encoder_final))
 
         if isinstance(self.rnn, nn.LSTM):
@@ -371,7 +363,6 @@ class EncoderDecoderAttnBaseBkp(nn.Module):
             Encoder(input_size=embedding_size,
                     hidden_size=hidden_size,
                     num_layers=num_layers,
-                    vocab=src_vocab,
                     dropout=dropout,
                     rnn_class=rnn_class),
             Decoder(emb_size=embedding_size,
@@ -387,8 +378,6 @@ class EncoderDecoderAttnBaseBkp(nn.Module):
                          embedding_dim=embedding_size,
                          padding_idx=tgt_pad_idx),
             Generator(hidden_size=hidden_size, vocab_size=tgt_vocab_size),
-            src_vocab=src_vocab,
-            tgt_vocab=tgt_vocab,
             max_output_len=self.MAX_OUTPUT_LEN)
 
     def to(self, device):
