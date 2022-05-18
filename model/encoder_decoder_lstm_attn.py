@@ -1,9 +1,6 @@
-import torch.nn as nn
-
-from model.base import EncoderDecoderAttnBase
+from model.base import EncoderDecoderAttnBaseBkp
 
 
-class EncoderDecoderLSTMAttn(EncoderDecoderAttnBase):
+class EncoderDecoderLSTMAttn(EncoderDecoderAttnBaseBkp):
     def __init__(self, **kwargs):
-        super(EncoderDecoderLSTMAttn, self).__init__(rnn_class=nn.LSTM,
-                                                    **kwargs)
+        super(EncoderDecoderLSTMAttn, self).__init__(rnn_type="lstm", **kwargs)

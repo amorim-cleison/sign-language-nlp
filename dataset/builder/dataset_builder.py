@@ -7,8 +7,8 @@ import pandas as pd
 from commons.log import auto_log_progress, log
 from commons.util import (exists, filename, filter_files, read_json,
                           save_items, get_hash, delete_file)
-from dataset.constant import PAD_WORD, UNK_WORD
-from torchtext.data import Field, TabularDataset, interleave_keys
+from dataset.constant import PAD_WORD, UNK_WORD, EOS_WORD, BOS_WORD
+from torchtext.legacy.data import Field, TabularDataset, interleave_keys
 
 
 class DatasetBuilder():
@@ -99,11 +99,21 @@ class DatasetBuilder():
                     unk_token=UNK_WORD,
                     preprocessing=preprocess_src,
                     include_lengths=True,
-                    batch_first=batch_first)
+                    batch_first=batch_first,
+                    # lower=True,
+                    init_token=None,
+                    eos_token=EOS_WORD
+                    )
         TGT = Field(is_target=True,
                     pad_first=True,
                     pad_token=PAD_WORD,
-                    batch_first=batch_first)
+                    batch_first=batch_first,
+                    # lower=True,
+                    # include_lengths=True,
+                    unk_token=UNK_WORD,
+                    # init_token=BOS_WORD,
+                    # eos_token=EOS_WORD
+                    )
         FILE = Field(batch_first=batch_first)
 
         # Dataset:

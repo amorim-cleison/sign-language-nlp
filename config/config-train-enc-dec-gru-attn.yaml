@@ -8,12 +8,16 @@ scoring: [precision_macro, recall_macro, f1_macro, precision_weighted, recall_we
 verbose: 3
 n_jobs: -1
 
+# minfreq   entries | srcvocab  tgtvocab  | embedding_size  hidden  layers  | loss (train)  f1 (weighted)
+# 2         12142*  | 19687     2286      | 256             2048    2       | 8.3054        0.4654        @18 (early stop)
+
+
 # Model:
 model: model.EncoderDecoderGRUAttn
 model_args:
-  embedding_size: 512
-  hidden_size: 2048
-  num_layers: 2
+  embedding_size: 128
+  hidden_size: 256
+  num_layers: 5
   dropout: 0.5
 
 # Criterion:
@@ -53,7 +57,7 @@ training_args:
   test_size: 0.15
   valid_size: 0.15
   early_stopping:
-    patience: 10
+    patience: 30
     threshold: 1e-4
     threshold_mode: rel
   gradient_clipping:
