@@ -160,7 +160,7 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
         _scoring_wrapper = build_scoring(scoring, labels, allow_multiple=False)
 
         return {
-            "refit": True,
+            "refit": False,
             "cv": cv,
             "verbose": verbose,
             "scoring": _scoring_wrapper,

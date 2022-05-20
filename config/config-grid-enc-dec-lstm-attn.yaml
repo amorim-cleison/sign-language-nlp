@@ -64,12 +64,24 @@ training_args:
     patience: 5
 
 # Grid search:
+# ROUND 2 ------------------------
 grid_args:
   cv: 5
   training_args:
-    lr: [0.1, 0.01, 0.001, 0.0001]
+    lr: [0.1]
   model_args:
-    embedding_size: [512, 128]
-    hidden_size: [1024, 256]
-    num_layers: [4, 2]
+    embedding_size: [1024, 512]
+    hidden_size: [128, 64]
+    num_layers: [2]
     dropout: [0.5, 0.1]
+
+# ROUND 1 ------------------------
+# grid_args:
+#   cv: 5
+#   training_args:
+#     lr: [0.1, 0.01, 0.001, 0.0001]
+#   model_args:
+#     embedding_size: [512, 128]
+#     hidden_size: [1024, 256]
+#     num_layers: [4, 2]
+#     dropout: [0.5, 0.1]
