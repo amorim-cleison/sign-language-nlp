@@ -8,17 +8,13 @@ scoring: [precision_macro, recall_macro, f1_macro, precision_weighted, recall_we
 verbose: 3
 n_jobs: -1
 
-# minfreq   entries | srcvocab  tgtvocab  | embedding_size  hidden  layers  | loss (train)  f1 (weighted)
-# 2         12142*  | 19687     2286      | 256             2048    2       | 8.3054        0.4654        @18 (early stop)
-
-
 # Model:
 model: model.EncoderDecoderGRUAttn
 model_args:
-  embedding_size: 128
+  embedding_size: 512
   hidden_size: 256
-  num_layers: 5
-  dropout: 0.5
+  num_layers: 2
+  dropout: 0.1
 
 # Criterion:
 criterion: torch.nn.CrossEntropyLoss
@@ -51,9 +47,9 @@ dataset_args:
 
 # Training:
 training_args:
-  max_epochs: 1000 # Original: 100
+  max_epochs: 5000
   batch_size: 50
-  lr: 0.1
+  lr: 0.01
   test_size: 0.15
   valid_size: 0.15
   early_stopping:
@@ -66,10 +62,3 @@ training_args:
     policy: ReduceLROnPlateau
     factor: 0.2
     patience: 5
-
-# Grid search:
-# grid_args:
-#   cv: 5
-#   training_args:
-#     lr: [0.1, 0.01, 0.001, 0.0001]
-  
