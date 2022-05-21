@@ -48,13 +48,13 @@ dataset_args:
 
 # Training:
 training_args:
-  max_epochs: 1000
+  max_epochs: 5000
   batch_size: 50
-  lr: 0.01
+  lr: 0.1
   test_size: 0.15
   valid_size: 0.15
   early_stopping:
-    patience: 10
+    patience: 30
     threshold: 1e-4
     threshold_mode: rel
   gradient_clipping:
@@ -63,9 +63,3 @@ training_args:
     policy: ReduceLROnPlateau
     factor: 0.2  # factor of 5 (1/5)
     patience: 5
-
-# Grid search:
-# grid_args:
-#   cv: 5
-#   training_args:
-#     lr: [0.1, 0.01, 0.001, 0.0001]
