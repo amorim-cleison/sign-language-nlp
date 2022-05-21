@@ -51,13 +51,13 @@ dataset_args:
 
 # Training:
 training_args:
-  max_epochs: 50
+  max_epochs: 100
   batch_size: 50
   lr: 0.01
   test_size: 0.15
   valid_size: 0.15
   early_stopping:
-    patience: 10
+    patience: 30
     threshold: 1e-4
     threshold_mode: rel
   gradient_clipping:
@@ -72,3 +72,9 @@ grid_args:
   cv: 5
   training_args:
     lr: [0.1, 0.01, 0.001, 0.0001]
+  model_args:
+    embedding_size: [1024, 512, 128]
+    hidden_size: [2048, 1024, 256]
+    num_layers: [6, 2]
+    dropout: [0.5, 0.1]
+    num_heads: [8, 4, 2]
