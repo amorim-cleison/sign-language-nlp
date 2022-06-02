@@ -101,5 +101,15 @@
             "justMyCode": false,
             "args": ["-c", "config/config-train-enc-dec-lstm-attn.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "2"]
         },
+
+        // (DEBUG) Out
+        {
+            "name": "(Debug) Out",
+            "type": "python",
+            "request": "launch",
+            "module": "read_out",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+        },
     ]
 }

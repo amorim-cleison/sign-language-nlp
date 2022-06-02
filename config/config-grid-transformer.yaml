@@ -73,8 +73,8 @@ grid_args:
   training_args:
     lr: [0.1, 0.01, 0.001, 0.0001]
   model_args:
-    embedding_size: [1024, 512, 128]
+    embedding_size: [512, 128]
     hidden_size: [2048, 1024, 256]
     num_layers: [6, 2]
     dropout: [0.5, 0.1]
-    num_heads: [8, 4, 2]
+    num_heads: [8, 4]
