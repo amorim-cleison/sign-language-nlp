@@ -1,0 +1,115 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Main",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-grid-lstm.yaml", "--debug", "False", "--cuda", "False"]
+        },
+
+        // GRID SEARCH:
+        {
+            "name": "Grid - Transformer",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--n_jobs", "-1"]
+        },
+        {
+            "name": "Grid - Enc-Dec GRU Attn",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-grid-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "False", "--n_jobs", "7"]
+        },
+        {
+            "name": "Grid - Enc-Dec LSTM Attn",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-grid-enc-dec-lstm-attn.yaml", "--cuda", "False", "--debug", "False", "--n_jobs", "-1"]
+        },
+
+        // TRAINING:
+        {
+            "name": "Train - Transformer",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-train-transformer.yaml", "--cuda", "False", "--debug", "False"]
+        },
+        {
+            "name": "Train - Enc-Dec GRU Attn",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-train-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "False"]
+        },
+        {
+            "name": "Train - Enc-Dec LSTM Attn",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-train-enc-dec-lstm-attn.yaml", "--cuda", "False", "--debug", "False"]
+        },
+       
+
+        // (DEBUG) TRAINING
+        {
+            "name": "(Debug) Train - Transformer",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-train-transformer.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "2"]
+        },
+        {
+            "name": "(Debug) Train - Enc-Dec GRU Attn",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-train-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "2"]
+        },
+        {
+            "name": "(Debug) Train - Enc-Dec LSTM Attn",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["-c", "config/config-train-enc-dec-lstm-attn.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "2"]
+        },
+
+        // (DEBUG) Out
+        {
+            "name": "(Debug) Out",
+            "type": "python",
+            "request": "launch",
+            "module": "read_out",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+        },
+    ]
+}
