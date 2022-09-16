@@ -1,0 +1,68 @@
+debug: False
+cuda: True
+seed: 1
+workdir: '../../work/sl-transformer/checkpoint/{model}/{datetime:%Y-%m-%d-%H-%M-%S}'
+verbose: 3
+n_jobs: -1
+cv: 5
+lr:  # tuned in grid search
+scoring: [neg_log_loss, precision_weighted, recall_weighted, f1_weighted]
+max_epochs: 5000
+batch_size: 50
+test_size: 0.15
+
+early_stopping:
+  patience: 30
+  threshold: 1e-4
+  threshold_mode: rel
+
+gradient_clipping:
+  gradient_clip_value: 0.5
+
+lr_scheduler: 
+  policy: ReduceLROnPlateau
+  factor: 0.2  # factor of 5 (1/5)
+  patience: 5
+
+# Model:
+model: model.EncoderDecoderLSTMAttn
+model_args:
+  embedding_size: # tuned in grid search
+  hidden_size:    # tuned in grid search
+  num_layers:     # tuned in grid search
+  dropout:        # tuned in grid search
+
+# Criterion:
+criterion: torch.nn.CrossEntropyLoss
+
+# Optimizer:
+optimizer: torch.optim.SGD
+optimizer_args:
+  nesterov: False
+  momentum: 0.9
+
+# Grid search:
+grid_args:
+  lr: [0.1, 0.01, 0.001, 0.0001]
+  model_args:
+    embedding_size: [1024, 512, 128]
+    hidden_size: [1024, 256, 128, 64]
+    num_layers: [4, 2]
+    dropout: [0.5, 0.1]
+
+# Dataset:
+dataset_args:
+  dataset_dir: ../../work/dataset/asl-phono/phonology/3d
+  fields: [
+    orientation_dh,
+    orientation_ndh, 
+    movement_dh, 
+    movement_ndh,
+    handshape_dh, 
+    handshape_ndh, 
+    # mouth_openness
+  ]
+  samples_min_freq: 2   # How many samples for the label should exist in dataset for the label to be considered?
+  composition_strategy: as_words
+  reuse_transient: True
+  balance_dataset: True

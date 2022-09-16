@@ -1,7 +1,7 @@
 import pandas as pd
 from commons.log import log
 from commons.util import load_args, save_json
-from sklearn.model_selection import GridSearchCV, cross_val_score
+from sklearn.model_selection import GridSearchCV
 from skorch import NeuralNetClassifier
 
 import helper as h
@@ -11,7 +11,8 @@ from dataset import AslDataset
 
 def run(args):
     # Seed:
-    h.setup_seed(**args)
+    seed = args["seed"]
+    h.setup_seed(seed)
 
     # Device:
     device = h.prepare_device(args["cuda"])
@@ -25,13 +26,11 @@ def run(args):
 
     # Balance dataset:
     if should_balance_dataset(args):
-        dataset = h.balance_dataset(dataset=dataset, seed=args["seed"])
+        dataset = h.balance_dataset(dataset=dataset, seed=seed)
     log(f"{len(dataset)} entries of data")
 
     # Callbacks:
-    callbacks, callbacks_names = h.build_callbacks(dataset=dataset,
-                                                   **args,
-                                                   **args["training_args"])
+    callbacks, callbacks_names = h.build_callbacks(dataset=dataset, **args)
 
     # Classifier:
     net_params = h.build_net_params(callbacks=callbacks,
@@ -41,45 +40,30 @@ def run(args):
                                     **args)
     net = NeuralNetClassifier(**net_params)
 
-    # Train:
-    if args["mode"] == "train":
-        run_training(net=net, dataset=dataset, **args, **args["training_args"])
-
-    # Grid search:
-    elif args["mode"] == "grid":
-        run_grid_search(net=net,
-                        callbacks_names=callbacks_names,
-                        dataset=dataset,
-                        **args)
-
-
-def run_training(net, dataset, test_size, **kwargs):
-    log("Training...")
-
-    test, train = dataset.split(test_size, indices_only=False)
-
-    # Fit:
-    net.fit(train, train.y().cpu())
-
-    # Score:
-    score = net.score(test, test.y().cpu())
-    log(f"Test score: {score:.4f}")
+    # Tune hyperparams and test:
+    test_size = args["test_size"]
+    test_data, train_data = dataset.split(lengths=test_size,
+                                          indices_only=False,
+                                          seed=seed)
+    best_estimator = tune_hyperparams(estimator=net,
+                                      callbacks_names=callbacks_names,
+                                      train_data=train_data,
+                                      **args)
+    test_model(estimator=best_estimator, test_data=test_data, **args)
 
 
-def run_grid_search(net, callbacks_names, dataset, **kwargs):
-    log("Grid search...")
+def tune_hyperparams(estimator, callbacks_names, train_data, **kwargs):
+    log("\n==================== TUNING HYPERPARAMETERS ====================\n")
 
     # Grid search:
     grid_params = h.build_grid_params(callbacks_names=callbacks_names,
-                                      dataset=dataset,
+                                      data=train_data,
                                       **kwargs)
-    gs = GridSearchCV(net, **grid_params)
+    gs = GridSearchCV(estimator=estimator, **grid_params)
     log(gs)
 
-    # FIXME: add support to RandomizedSearchCV
-
     # Fit:
-    gs.fit(dataset.X(), dataset.y())
+    gs.fit(X=train_data.X(), y=train_data.y().to_array())
 
     # Output:
     gs_output = {
@@ -92,9 +76,31 @@ def run_grid_search(net, callbacks_names, dataset, **kwargs):
 
     # Save output:
     log("Saving grid search output...")
-    save_json(data=gs_output, path=f"{args['workdir']}/grid_search.json")
+    save_json(data=gs_output,
+              path=f"{args['workdir']}/grid_search_output.json")
     pd.DataFrame(
         gs.cv_results_).to_csv(f"{args['workdir']}/grid_search_results.csv")
+
+    # Return best estimator found:
+    return gs.best_estimator_
+
+
+def test_model(estimator, test_data, scoring, **kwargs):
+    log("\n==================== TESTING MODEL ====================\n")
+
+    # Metrics:
+    scorers = h.build_scoring(scoring=["accuracy", *scoring],
+                              labels=test_data.labels())
+    test_output = {
+        f"test_{scorer.score}": scorer(estimator, test_data.X(),
+                                       test_data.y().to_array())
+        for scorer in scorers
+    }
+    log(test_output)
+
+    # Save output:
+    log("Saving test output...")
+    save_json(data=test_output, path=f"{args['workdir']}/test_output.json")
 
 
 def should_balance_dataset(args):

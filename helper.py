@@ -35,22 +35,15 @@ def dump_args(args):
     save_args(args, normpath(f"{_dir}/config.yaml"))
 
 
-def build_net_params(training_args, model_args, model, optimizer, criterion,
-                     mode, callbacks, callbacks_names, device, dataset,
-                     optimizer_args, criterion_args, **kwargs):
+def build_net_params(model_args, model, optimizer, criterion, callbacks,
+                     callbacks_names, device, dataset, optimizer_args,
+                     criterion_args, **kwargs):
     src_vocab = dataset.vocab_X
     tgt_vocab = dataset.vocab_y
 
-    # Train-split:
-    assert ("valid_size"
-            in training_args), "`valid_size` is a required parameter"
-    train_split = CVSplit(training_args["valid_size"])
-
     # Callbacks args:
     _callbacks_args = build_callbacks_args(model=model,
-                                           mode=mode,
                                            callbacks_names=callbacks_names,
-                                           **training_args,
                                            **kwargs)
 
     # Module args:
@@ -90,7 +83,7 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
         "lr", "max_epochs", "batch_size", "predict_nonlinearity", "warm_start",
         "verbose"
     ]
-    _net_args = filter_by_keys(training_args, keys_to_filter=KEYS_FOR_NET)
+    _net_args = filter_by_keys(kwargs, keys_to_filter=KEYS_FOR_NET)
 
     return {
         "device": device,
@@ -98,7 +91,6 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
         "optimizer": locate(optimizer),
         "criterion": locate(criterion),
         "callbacks": callbacks,
-        "train_split": train_split,
         "dataset": AslDataset,
         **_net_args,
         **_module_args,
@@ -111,14 +103,14 @@ def build_net_params(training_args, model_args, model, optimizer, criterion,
 
 
 def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
-                      verbose, n_jobs, dataset, **kwargs):
+                      verbose, n_jobs, cv, data, **kwargs):
     def unpack(callbacks_names,
                model,
                workdir,
                scoring,
                verbose,
                n_jobs,
-               dataset,
+               data,
                cv,
                training_args={},
                model_args={},
@@ -127,11 +119,10 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
                **kwargs):
         # Callbacks args:
         _callbacks_args = build_callbacks_args(model=model,
-                                               mode="grid",
                                                workdir=workdir,
                                                callbacks_names=callbacks_names,
                                                ensure_list=True,
-                                               **training_args)
+                                               **kwargs)
 
         # Module args:
         _module_args = prefix_args("module", ensure_list=True, **model_args)
@@ -146,8 +137,8 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
                                       ensure_list=True,
                                       **criterion_args)
 
-        # Training args:
-        _training_args = prefix_args(None, ensure_list=True, **training_args)
+        # General args:
+        _kwargs = prefix_args(None, ensure_list=True, **kwargs)
 
         # Other args:
         KEYS_FOR_GRID = [
@@ -156,11 +147,11 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
         _grid_args = filter_by_keys(kwargs, keys_to_filter=KEYS_FOR_GRID)
 
         # Scoring:
-        labels = dataset.labels()
+        labels = data.labels()
         _scoring_wrapper = build_scoring(scoring, labels, allow_multiple=False)
 
         return {
-            "refit": False,
+            "refit": True,
             "cv": cv,
             "verbose": verbose,
             "scoring": _scoring_wrapper,
@@ -171,7 +162,7 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
                 **_optimizer_args,
                 **_criterion_args,
                 **_callbacks_args,
-                **_training_args
+                **_kwargs
             }
         }
 
@@ -181,21 +172,34 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
                   scoring=scoring,
                   verbose=verbose,
                   n_jobs=n_jobs,
-                  dataset=dataset,
+                  data=data,
+                  cv=cv,
                   **grid_args)
+
+
+def build_test_params(scoring, verbose, n_jobs, cv, data, **kwargs):
+    # Scoring:
+    labels = data.labels()
+    _scoring_wrapper = build_scoring(scoring, labels, allow_multiple=False)
+
+    return {
+        "cv": cv,
+        "n_jobs": n_jobs,
+        "verbose": verbose,
+        "scoring": _scoring_wrapper,
+        "error_score": "raise",
+    }
 
 
 def build_callbacks(mode,
                     workdir,
-                    resumable,
                     scoring,
                     dataset,
                     early_stopping=None,
                     gradient_clipping=None,
                     lr_scheduler=None,
                     **kwargs):
-    has_valid = True
-    monitor = "valid" if has_valid else "train"
+    monitor = "valid"
 
     # Callbacks:
     callbacks = []
@@ -204,9 +208,9 @@ def build_callbacks(mode,
     checkpoint = Checkpoint(monitor=f"{monitor}_loss_best", dirname=workdir)
     callbacks.append(("checkpoint", checkpoint))
 
-    # Init state (resume):
-    if resumable and mode == "train":
-        callbacks.append(("resume_state", LoadInitState(checkpoint)))
+    # # Init state (resume):
+    # if resumable:
+    #     callbacks.append(("resume_state", LoadInitState(checkpoint)))
 
     # Early stopping:
     if early_stopping:
@@ -225,10 +229,10 @@ def build_callbacks(mode,
     def lr_score(net, X, y=None):
         return net.optimizer_.param_groups[0]["lr"]
 
-    callbacks.append(("lr_scoring",
-                      EpochScoring(scoring=lr_score,
-                                   name='lr',
-                                   on_train=not has_valid)))
+    callbacks.append(
+        ("lr_scoring", EpochScoring(scoring=lr_score,
+                                    name='lr',
+                                    on_train=False)))
 
     # LR Scheduler:
     if lr_scheduler:
@@ -245,11 +249,19 @@ def build_callbacks(mode,
     scoring_wrappers = build_scoring(scoring, labels, allow_multiple=True)
 
     for wrapper in scoring_wrappers:
+        # Valid:
         callbacks.append(
-            (f"score_{wrapper.score}",
+            (f"score_valid_{wrapper.score}",
              EpochScoring(scoring=wrapper,
-                          name=f"{monitor}_{wrapper.score}",
-                          on_train=not has_valid,
+                          name=f"valid_{wrapper.score}",
+                          on_train=False,
+                          lower_is_better=not wrapper.greater_is_better)))
+        # Train:
+        callbacks.append(
+            (f"score_train_{wrapper.score}",
+             EpochScoring(scoring=wrapper,
+                          name=f"train_{wrapper.score}",
+                          on_train=True,
                           lower_is_better=not wrapper.greater_is_better)))
 
     # Callbacks names:
@@ -290,7 +302,12 @@ def collate_data(data):
 
 
 def format_dir(dir, **kwargs):
-    return normpath(dir.format(**kwargs)) if dir is not None else ''
+    from datetime import datetime
+    params = {
+        "datetime": datetime.now(),
+        **kwargs,
+    }
+    return normpath(dir.format(**params)) if dir is not None else ''
 
 
 def filter_by_keys(map, keys_to_filter, not_in=False):
@@ -391,6 +408,8 @@ class ScoringWrapper:
         # FIXME: add support to externalize scoring kwargs/options:
         if (score_func == 'neg_log_loss'):
             self.scorer._kwargs["labels"] = labels
+        elif (score_func == 'accuracy'):
+            pass
         else:
             self.scorer._kwargs["zero_division"] = 0
 
