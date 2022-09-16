@@ -5,6 +5,28 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug",
+            "type": "python",
+            "request": "launch",
+            "module": "main",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "-c",
+                "config/config-transformer.yaml",
+                "--cuda",
+                "False",
+                "--debug",
+                "True",
+                "--max_epochs",
+                "5",
+                "--n_jobs",
+                "3",
+                "--grid_args",
+                "{ 'lr': [0.1], 'model_args': { 'embedding_size': [128], 'hidden_size': [256], 'num_layers': [2], 'dropout': [0.1], 'num_heads': [4] }}",
+            ]
+        },
+        {
             "name": "Transformer",
             "type": "python",
             "request": "launch",

@@ -4,10 +4,11 @@ from pydoc import locate
 import numpy as np
 import torch
 from commons.log import log
-from commons.util import normpath, save_args, create_if_missing
+from commons.util import (normpath, save_args, create_if_missing, save_json,
+                          save_items)
 from sklearn.model_selection import *
 from skorch.callbacks import (Checkpoint, EarlyStopping, EpochScoring,
-                              GradientNormClipping, LoadInitState, LRScheduler)
+                              GradientNormClipping, LRScheduler)
 from skorch.dataset import CVSplit
 
 from dataset import AslDataset
@@ -398,6 +399,55 @@ def save_stats_datasets(device, args):
     labels_bal = ds_bal._AslDataset__data[:][1]
     cnt_bal = Counter(labels_bal)
     save_json(dict(cnt_bal), "./tmp_bal.json")
+
+
+def save_output(output, phase, workdir, **kwargs):
+    save_json(output, f"{workdir}/{phase}_output.json")
+
+
+def save_profile(profiler, phase, workdir, **kwargs):
+    # Table:
+    table = profiler.key_averages().table(sort_by="self_cpu_time_total",
+                                          top_level_events_only=True)
+    save_items([table], f"{workdir}/{phase}_profile_table.txt")
+
+    # Details:
+    total_average = profiler.total_average()
+    details = {
+        # CPU:
+        "cpu_children": total_average.cpu_children,
+        "cpu_parent": total_average.cpu_parent,
+        "cpu_memory_usage": total_average.cpu_memory_usage,
+        "cpu_time": total_average.cpu_time,
+        "cpu_time_str": total_average.cpu_time_str,
+        "cpu_time_total": total_average.cpu_time_total,
+        "cpu_time_total_str": total_average.cpu_time_total_str,
+        "self_cpu_memory_usage": total_average.self_cpu_memory_usage,
+        "self_cpu_time_total": total_average.self_cpu_time_total,
+        "self_cpu_time_total_str": total_average.self_cpu_time_total_str,
+
+        # CUDA:
+        "cuda_memory_usage": total_average.cuda_memory_usage,
+        "cuda_time": total_average.cuda_time,
+        "cuda_time_str": total_average.cuda_time_str,
+        "cuda_time_total": total_average.cuda_time_total,
+        "cuda_time_total_str": total_average.cuda_time_total_str,
+        "self_cuda_memory_usage": total_average.self_cuda_memory_usage,
+        "self_cuda_time_total": total_average.self_cuda_time_total,
+        "self_cuda_time_total_str": total_average.self_cuda_time_total_str,
+
+        # FLOPS:
+        "flops": total_average.flops,
+
+        # Others:
+        "device_type": total_average.device_type.name,
+        "count": total_average.count,
+        "input_shapes": str(total_average.input_shapes),
+        "stack": str(total_average.stack),
+        "scope": str(total_average.scope),
+    }
+    log(details)
+    save_json(details, f"{workdir}/{phase}_profile.json")
 
 
 class ScoringWrapper:
