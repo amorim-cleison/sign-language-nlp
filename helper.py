@@ -402,6 +402,7 @@ def save_stats_datasets(device, args):
 
 
 def save_output(output, phase, workdir, **kwargs):
+    log(output)
     save_json(output, f"{workdir}/{phase}_output.json")
 
 

@@ -86,7 +86,6 @@ def tune_hyperparams(estimator,
             "best_index": int(gs.best_index_),
             "scoring": str(gs.scoring)
         }
-        log(gs_output)
 
     # Save output:
     log("Saving output...")
@@ -118,7 +117,6 @@ def test_model(estimator, test_data, scoring, cuda, profile=True, **kwargs):
                                            test_data.y().to_array())
             for scorer in scorers
         }
-        log(test_output)
 
     # Save output:
     log("Saving output...")
