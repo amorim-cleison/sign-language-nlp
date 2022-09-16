@@ -1,0 +1,65 @@
+debug: False
+cuda: True
+seed: 1
+mode: train
+resumable: False
+workdir: ../../work/sl-transformer/checkpoint/{model}/{mode}
+scoring: [precision_macro, recall_macro, f1_macro, precision_weighted, recall_weighted, f1_weighted]
+verbose: 3
+n_jobs: -1
+
+# Model:
+model: model.EncoderDecoderLSTMAttn
+model_args:
+  embedding_size: 1024
+  hidden_size: 128
+  num_layers: 2
+  dropout: 0.1
+
+# Criterion:
+criterion: torch.nn.CrossEntropyLoss
+
+# Optimizer:
+optimizer: torch.optim.SGD
+optimizer_args:
+  # SGD ---
+  nesterov: False
+  momentum: 0.9
+  # dampening: 0
+  # weight_decay: 0
+
+# Dataset:
+dataset_args:
+  dataset_dir: ../../work/dataset/asl-phono/phonology/3d
+  fields: [
+    orientation_dh,
+    orientation_ndh, 
+    movement_dh, 
+    movement_ndh,
+    handshape_dh, 
+    handshape_ndh, 
+    # mouth_openness
+  ]
+  samples_min_freq: 2   # How many samples for the label should exist in dataset for the label to be considered?
+  composition_strategy: as_words
+  reuse_transient: True
+  balance_dataset: True
+
+# Training:
+training_args:
+  max_epochs: 5000
+  batch_size: 50
+  lr: 0.1
+  test_size: 0.15
+  valid_size: 0.15
+  early_stopping:
+    patience: 30
+    threshold: 1e-4
+    threshold_mode: rel
+  gradient_clipping:
+    gradient_clip_value: 0.5
+  lr_scheduler: 
+    policy: ReduceLROnPlateau
+    factor: 0.2
+    patience: 5
+  
