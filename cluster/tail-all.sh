@@ -1,3 +1,2 @@
-
-echo 'Showing logs...'
+printf 'Showing logs...\n\n'
 tail -f out/*.out

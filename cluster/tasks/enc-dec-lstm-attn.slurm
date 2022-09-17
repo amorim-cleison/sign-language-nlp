@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=ED-LSTM
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=2
 #SBATCH --ntasks=8
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:1
 #SBATCH --mem=16G
 #SBATCH --output=enc-dec-lstm-attn.out
 
