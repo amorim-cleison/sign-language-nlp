@@ -1,5 +1,5 @@
-printf 'Cancelling all tasks...\n\n'
+printf 'Cancelling all tasks...\n'
 scancel -u cca5
 
 sleep 5s
-squeue
+./status-cluster.sh
