@@ -43,12 +43,12 @@ optimizer_args:
 
 # Grid search:
 grid_args:
-  lr: [0.1, 0.01, 0.001, 0.0001]
+  lr: [0.0001, 0.001, 0.01, 0.1]
   model_args:
-    embedding_size: [1024, 512, 128]
-    hidden_size: [1024, 256, 128, 64]
-    num_layers: [4, 2]
-    dropout: [0.5, 0.1]
+    embedding_size: [128, 512, 1024]
+    hidden_size: [64, 128, 256, 1024]
+    num_layers: [2, 4]
+    dropout: [0.1, 0.5]
 
 # Dataset:
 dataset_args:
