@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=ED-GRU
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=2
 #SBATCH --ntasks=8
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:1
 #SBATCH --mem=16G
 #SBATCH --output=enc-dec-gru-attn.out
 
@@ -16,4 +16,3 @@ cd ../../
 singularity exec --nv ~/containers/openpose.sif poetry run python main.py --config config/config-enc-dec-gru-attn.yaml --n_jobs=8
 
 echo "Command finished."
-

@@ -1,10 +1,10 @@
 mkdir -p out/
 
-echo 'Submitting all tasks...'
-(cd out/ && for FILE in ../tasks/*.slurm; do sbatch -p long_gpu $FILE; done)
+printf 'Submitting all tasks...\n'
+(cd out/ && for FILE in ../tasks/*.slurm; do printf ' Submitting %s... ' "$FILE"; sbatch -p long_gpu $FILE; sleep 15s; done)
 
-sleep 2s
+printf '\n'
 squeue
 
-sleep 5s
+printf '\n'
 ./tail-all.sh
