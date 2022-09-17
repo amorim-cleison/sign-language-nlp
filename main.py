@@ -111,8 +111,9 @@ def test_model(estimator, test_data, scoring, cuda, profile=True, **kwargs):
                                          profile_memory=True,
                                          with_flops=True) as prof:
         # Metrics:
-        scorers = h.build_scoring(scoring=["accuracy", *scoring],
-                                  labels=test_data.labels())
+        if "accuracy" not in scoring:
+            scoring = ["accuracy", *scoring]
+        scorers = h.build_scoring(scoring=scoring, labels=test_data.labels())
         test_output = {
             f"test_{scorer.score}": scorer(estimator, test_data.X(),
                                            test_data.y().to_array())

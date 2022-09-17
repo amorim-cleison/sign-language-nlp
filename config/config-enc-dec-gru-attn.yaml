@@ -6,7 +6,7 @@ verbose: 3
 n_jobs: -1
 cv: 5
 lr:  # tuned in grid search
-scoring: [neg_log_loss, precision_weighted, recall_weighted, f1_weighted]
+scoring: [neg_log_loss, accuracy, precision_weighted, recall_weighted, f1_weighted]
 max_epochs: 5000
 batch_size: 50
 test_size: 0.15
