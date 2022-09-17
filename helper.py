@@ -2,17 +2,18 @@ import random
 from pydoc import locate
 
 import numpy as np
+import pandas as pd
 import torch
 from commons.log import log
-from commons.util import (normpath, save_args, create_if_missing, save_json,
-                          save_items)
+from commons.util import (create_if_missing, normpath, save_args, save_items,
+                          save_json)
 from sklearn.model_selection import *
 from skorch.callbacks import (Checkpoint, EarlyStopping, EpochScoring,
                               GradientNormClipping, LRScheduler)
 from skorch.dataset import CVSplit
 
-from dataset import AslDataset
 import model.util as util
+from dataset import AslDataset
 
 
 def setup_seed(seed, **kwargs):
@@ -388,6 +389,7 @@ def balance_dataset(dataset, seed):
 
 def save_stats_datasets(device, args):
     from collections import Counter
+
     from commons.util import save_json
 
     ds = AslDataset(device=device, batch_first=True, **args)
@@ -399,6 +401,27 @@ def save_stats_datasets(device, args):
     labels_bal = ds_bal._AslDataset__data[:][1]
     cnt_bal = Counter(labels_bal)
     save_json(dict(cnt_bal), "./tmp_bal.json")
+
+
+def save_param_grid(grid_params, phase, workdir, **kwargs):
+    import itertools
+
+    log("Saving grid params...")
+
+    vals = [x for x in grid_params.values()]
+    cols = [x for x in grid_params.keys()]
+    cross_product = list(itertools.product(*vals))
+
+    df_param_grid = pd.DataFrame(cross_product, columns=cols)
+    log(df_param_grid)
+    df_param_grid.to_csv(f"{workdir}/{phase}_grid_params.csv")
+
+
+def save_cv_results(cv_results, phase, workdir, **kwargs):
+    log("Saving CV results...")
+    df_cv_results = pd.DataFrame(cv_results)
+    log(df_cv_results)
+    df_cv_results.to_csv(f"{workdir}/{phase}_results.csv")
 
 
 def save_output(output, phase, workdir, **kwargs):

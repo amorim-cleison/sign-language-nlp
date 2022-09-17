@@ -1,4 +1,4 @@
-import pandas as pd
+import torch
 from commons.log import log
 from commons.util import load_args
 from sklearn.model_selection import GridSearchCV
@@ -7,7 +7,6 @@ from skorch import NeuralNetClassifier
 import helper as h
 from args import ARGUMENTS
 from dataset import AslDataset
-import torch
 
 
 def run(args):
@@ -20,11 +19,13 @@ def run(args):
     device = h.prepare_device(cuda)
 
     # Dataset:
+    if args["debug"]:
+        args["dataset_args"]["reuse_transient"] = True
     # h.save_stats_datasets(device, args)
     dataset = AslDataset(device=device, batch_first=True, **args).stoi()
 
     if args["debug"]:
-        dataset = dataset.truncated(100)
+        dataset = dataset.truncated(args["cv"] * 10)
 
     # Balance dataset:
     if should_balance_dataset(args):
@@ -70,11 +71,14 @@ def tune_hyperparams(estimator,
                                          profile_memory=True,
                                          with_flops=True) as prof:
         # Grid search:
-        grid_params = h.build_grid_params(callbacks_names=callbacks_names,
-                                          data=train_data,
-                                          **kwargs)
-        gs = GridSearchCV(estimator=estimator, **grid_params)
-        log(grid_params)
+        gs_params = h.build_grid_params(callbacks_names=callbacks_names,
+                                        data=train_data,
+                                        **kwargs)
+        gs = GridSearchCV(estimator=estimator, **gs_params)
+        log(gs_params)
+
+        # Params grid:
+        h.save_param_grid(gs.param_grid, phase=phase, **kwargs)
 
         # Fit:
         gs.fit(X=train_data.X(), y=train_data.y().to_array())
@@ -89,8 +93,7 @@ def tune_hyperparams(estimator,
 
     # Save output:
     h.save_output(gs_output, phase=phase, **kwargs)
-    pd.DataFrame(
-        gs.cv_results_).to_csv(f"{args['workdir']}/{phase}_results.csv")
+    h.save_cv_results(gs.cv_results_, phase=phase, **kwargs)
 
     # Save profile:
     h.save_profile(prof, phase=phase, **kwargs)

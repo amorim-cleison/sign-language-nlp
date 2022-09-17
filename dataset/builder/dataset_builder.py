@@ -25,7 +25,7 @@ class DatasetBuilder():
               **kwargs):
         log("Loading dataset...")
 
-        # Should reuse or create an exclusive:
+        # Should reuse or create an exclusive one:
         if (reuse_transient):
             _name = get_hash({
                 "dir": dataset_dir,
