@@ -88,13 +88,11 @@ def tune_hyperparams(estimator,
         }
 
     # Save output:
-    log("Saving output...")
     h.save_output(gs_output, phase=phase, **kwargs)
     pd.DataFrame(
         gs.cv_results_).to_csv(f"{args['workdir']}/{phase}_results.csv")
 
     # Save profile:
-    log("Saving profile...")
     h.save_profile(prof, phase=phase, **kwargs)
 
     # Return best estimator found:
@@ -119,11 +117,9 @@ def test_model(estimator, test_data, scoring, cuda, profile=True, **kwargs):
         }
 
     # Save output:
-    log("Saving output...")
     h.save_output(test_output, phase=phase, **kwargs)
 
     # Save profile:
-    log("Saving profile...")
     h.save_profile(prof, phase=phase, **kwargs)
 
 

@@ -402,11 +402,14 @@ def save_stats_datasets(device, args):
 
 
 def save_output(output, phase, workdir, **kwargs):
+    log("Saving output...")
     log(output)
     save_json(output, f"{workdir}/{phase}_output.json")
 
 
 def save_profile(profiler, phase, workdir, **kwargs):
+    log("Saving profile...")
+
     # Table:
     table = profiler.key_averages().table(sort_by="self_cpu_time_total",
                                           top_level_events_only=True)
