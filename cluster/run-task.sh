@@ -47,7 +47,7 @@ done
 echo "Waiting ${SLEEP_TIME} for workers to initialize..."
 sleep ${SLEEP_TIME} &&
 
-echo "Running project..."
-singularity exec --nv ~/containers/openpose.sif poetry run python main.py --config ${CONFIG_FILE} --n_jobs=-1 --dask "{ 'host': ${DASK_HOST}, 'port': ${DASK_PORT}, 'source': ${DASK_SOURCE} }" &&
+echo "Executing task..."
+singularity exec --nv ~/containers/openpose.sif poetry run python main.py --config ${CONFIG_FILE} --n_jobs=-1 --dask "{ 'host': '${DASK_HOST}', 'port': '${DASK_PORT}', 'source': '${DASK_SOURCE}' }" &&
 
 echo "Command finished."
