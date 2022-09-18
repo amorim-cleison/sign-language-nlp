@@ -155,30 +155,16 @@ def should_balance_dataset(args):
 # FIXME
 def init_dask_client():
     from dask.distributed import Client
-    import dask_jobqueue
+    from commons.util import normpath
+    from dask_cuda import LocalCUDACluster
 
     log("Initializing dask client...")
 
-    cluster = dask_jobqueue.SLURMCluster(
-        n_workers=2,
-        cores=8,                                # cpus-per-task
-        # processes=4,    # 
-        memory="16GB",                          # mem
-        # project="woodshole",
-        walltime="7-00:00:00",
-        queue="long_gpu",
-        job_extra_directives=["--gres=gpu:2"],  # gres
-        silence_logs="debug",
-        # name="TRNSF",
-        job_name="TRNSF",                       # job-name
-        log_directory="./out/"
-    )
-    # cluster.scale(2)
-
-    # debug
-    print(cluster.job_script())
-
+    cluster = LocalCUDACluster()
     client = Client(cluster)
+
+    # client = Client("localhost:8786")
+    client.upload_file(normpath("dist/source.zip"))
 
     log("Dask client initialized")
     return client
