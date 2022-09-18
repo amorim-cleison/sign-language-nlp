@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from commons.log import log
 from commons.util import (create_if_missing, normpath, save_args, save_items,
-                          save_json, replace_special_chars)
+                          save_json)
 from sklearn.model_selection import *
 from skorch.callbacks import (Checkpoint, EarlyStopping, EpochScoring,
                               GradientNormClipping, LRScheduler)
@@ -491,10 +491,9 @@ def create_dask_client(dask_args, **kwargs):
     # Cluster:
     if (torch.cuda.is_available()):
         from dask_cuda import LocalCUDACluster
-
         gpus = os.getenv("CUDA_VISIBLE_DEVICES")
         cluster = LocalCUDACluster(
-            name=f"cluster-{node}-gpu{replace_special_chars(gpus)}",
+            name=f"cluster-{node}-gpu{gpus}",
             threads_per_worker=cpus_per_task)
     else:
         from dask.distributed import LocalCluster
