@@ -1,7 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=TRANSFOR
-#SBATCH --cpus-per-task=5
-#SBATCH --ntasks=2
+#SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:1
 #SBATCH --mem=20G
 #SBATCH --output=transformer.out
