@@ -49,4 +49,5 @@ ARGUMENTS = [
              '--grid_args',
              type=dict,
              help='Options for the grid search'),
+    Argument('-dask', '--dask_args', type=dict, help='Dask configurations', required=True),
 ]
