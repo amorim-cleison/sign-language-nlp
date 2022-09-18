@@ -38,10 +38,6 @@ echo "Initializing scheduler..."
 singularity exec --nv ~/containers/openpose.sif poetry run dask-scheduler --host ${DASK_HOST} --port ${DASK_PORT}  &
 
 echo "Initializing workers..."
-# CUDA_VISIBLE_DEVICES=0 singularity exec --nv ~/containers/openpose.sif poetry run dask-worker localhost:8786 --nworkers 'auto' --name 'worker-1' &
-# CUDA_VISIBLE_DEVICES=1 singularity exec --nv ~/containers/openpose.sif poetry run dask-worker localhost:8786 --nworkers 'auto' --name 'worker-2' & 
-# CUDA_VISIBLE_DEVICES=${SLURM_STEP_GPUS:-$SLURM_JOB_GPUS} singularity exec --nv ~/containers/openpose.sif poetry run dask-worker localhost:8786 --nworkers 1 --name 'worker-2' &
-
 IFS=',' read -ra GPU <<< "${SLURM_STEP_GPUS:-$SLURM_JOB_GPUS}"
 for i in "${GPU[@]}"; do
   echo " - Worker for GPU ${i}..."
