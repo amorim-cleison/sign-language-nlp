@@ -5,5 +5,5 @@
 #SBATCH --mem=20G
 #SBATCH --output=enc-dec-gru-attn.out
 
-./../run-task.sh -c config/config-enc-dec-gru-attn.yaml.yaml
+./../run-task.sh -c config/config-enc-dec-gru-attn.yaml
 
