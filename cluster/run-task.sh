@@ -17,8 +17,8 @@ validate_param "c" ${CONFIG_FILE}
 
 
 # ---------- CODE -----------------
-NODE = ${SLURMD_NODENAME}
-CPUS_PER_TASK = ${SLURM_CPUS_PER_TASK}
+NODE=${SLURMD_NODENAME}
+CPUS_PER_TASK=${SLURM_CPUS_PER_TASK}
 
 echo "Starting command..."
 cd ../../

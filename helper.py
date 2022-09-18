@@ -483,31 +483,30 @@ def create_dask_client(dask_args, **kwargs):
 
     log("Initializing Dask client...")
 
-    def __unpack_args(node="localhost",
-                      cpus_per_task=os.cpu_count(),
-                      **kwargs):
-        # FIXME: and linux
-        # Cluster:
-        if (torch.cuda.is_available()):
-            from dask_cuda import LocalCUDACluster
+    # Parameters:
+    node = str(dask_args.get("node", "localhost"))
+    cpus_per_task = int(dask_args.get("cpus_per_task", os.cpu_count()))
 
-            gpus = os.getenv("CUDA_VISIBLE_DEVICES")
-            cluster = LocalCUDACluster(
-                name=f"cluster-{node}-gpu{replace_special_chars(gpus)}",
-                threads_per_worker=cpus_per_task)
-        else:
-            from dask.distributed import LocalCluster
-            cluster = LocalCluster(name=f"cluster-{node}-cpu",
-                                   threads_per_worker=cpus_per_task)
-        log(f" > Cluster initialized: {cluster}")
+    # FIXME: and linux
+    # Cluster:
+    if (torch.cuda.is_available()):
+        from dask_cuda import LocalCUDACluster
 
-        # Client:
-        client = Client(cluster)
-        log(f" > Client initialized: {client}")
+        gpus = os.getenv("CUDA_VISIBLE_DEVICES")
+        cluster = LocalCUDACluster(
+            name=f"cluster-{node}-gpu{replace_special_chars(gpus)}",
+            threads_per_worker=cpus_per_task)
+    else:
+        from dask.distributed import LocalCluster
+        cluster = LocalCluster(name=f"cluster-{node}-cpu",
+                               threads_per_worker=cpus_per_task)
+    log(f" > Cluster initialized: {cluster}")
 
-        return client
+    # Client:
+    client = Client(cluster)
+    log(f" > Client initialized: {client}")
 
-    return __unpack_args(**dask_args)
+    return client
 
 
 class ScoringWrapper:
