@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from commons.log import log
 from commons.util import (create_if_missing, normpath, save_args, save_items,
-                          save_json)
+                          save_json, replace_special_chars)
 from sklearn.model_selection import *
 from skorch.callbacks import (Checkpoint, EarlyStopping, EpochScoring,
                               GradientNormClipping, LRScheduler)
@@ -478,23 +478,32 @@ def save_profile(profiler, phase, workdir, **kwargs):
 
 
 def create_dask_client(dask_args, **kwargs):
+    import os
+    from dask.distributed import Client
+
     log("Initializing Dask client...")
 
-    def __unpack_args(host=None, port=None, source=None, **kwargs):
-        from dask.distributed import Client
+    def __unpack_args(node="localhost",
+                      cpus_per_task=os.cpu_count(),
+                      **kwargs):
+        # FIXME: and linux
+        # Cluster:
+        if (torch.cuda.is_available()):
+            from dask_cuda import LocalCUDACluster
 
-        # Create client:
-        if (host and port):
-            client = Client(f"{host}:{port}")
+            gpus = os.getenv("CUDA_VISIBLE_DEVICES")
+            cluster = LocalCUDACluster(
+                name=f"cluster-{node}-gpu{replace_special_chars(gpus)}",
+                threads_per_worker=cpus_per_task)
         else:
-            client = Client()
+            from dask.distributed import LocalCluster
+            cluster = LocalCluster(name=f"cluster-{node}-cpu",
+                                   threads_per_worker=cpus_per_task)
+        log(f" > Cluster initialized: {cluster}")
 
+        # Client:
+        client = Client(cluster)
         log(f" > Client initialized: {client}")
-
-        # Upload source code:
-        if source:
-            log(f" > Uploading '{source}' to client...")
-            client.upload_file(normpath(source))
 
         return client
 

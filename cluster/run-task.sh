@@ -17,10 +17,8 @@ validate_param "c" ${CONFIG_FILE}
 
 
 # ---------- CODE -----------------
-DASK_SOURCE="dist/source.zip"
-DASK_HOST="localhost"
-DASK_PORT=8786
-SLEEP_TIME=30s
+NODE = ${SLURMD_NODENAME}
+CPUS_PER_TASK = ${SLURM_CPUS_PER_TASK}
 
 echo "Starting command..."
 cd ../../
@@ -29,25 +27,8 @@ echo "Loading singularity modules..."
 module load cuda-10.2-gcc-8.3.0-nxzzh52 &&
 module load singularity-3.6.2-gcc-8.3.0-quskioo &&
 
-echo "Creating '${DASK_SOURCE}'..."
-singularity exec --nv ~/containers/openpose.sif poetry build -f sdist &&
-cp dist/*.whl ${DASK_SOURCE} &&
-
-
-echo "Initializing scheduler..."
-singularity exec --nv ~/containers/openpose.sif poetry run dask-scheduler --host ${DASK_HOST} --port ${DASK_PORT}  &
-
-echo "Initializing workers..."
-IFS=',' read -ra GPU <<< "${SLURM_STEP_GPUS:-$SLURM_JOB_GPUS}"
-for i in "${GPU[@]}"; do
-  echo " - Worker for GPU ${i}..."
-  CUDA_VISIBLE_DEVICES=$i singularity exec --nv ~/containers/openpose.sif poetry run dask-worker "${DASK_HOST}:${DASK_PORT}" --name "Worker-GPU${i}" --nworkers 'auto' &
-done
-
-echo "Waiting ${SLEEP_TIME} for workers to initialize..."
-sleep ${SLEEP_TIME} &&
-
 echo "Executing task..."
-singularity exec --nv ~/containers/openpose.sif poetry run python main.py --config ${CONFIG_FILE} --n_jobs=-1 --dask "{ 'host': '${DASK_HOST}', 'port': '${DASK_PORT}', 'source': '${DASK_SOURCE}' }" &&
+echo " > GPUs available: ${CUDA_VISIBLE_DEVICES}"
+singularity exec --nv ~/containers/openpose.sif poetry run python main.py --config ${CONFIG_FILE} --n_jobs=-1 --dask "{ 'node': '${NODE}', 'cpus_per_task': '${CPUS_PER_TASK}' }" &&
 
 echo "Command finished."
