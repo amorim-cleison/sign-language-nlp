@@ -17,7 +17,7 @@ validate_param "c" ${CONFIG_FILE}
 
 
 # ---------- CODE -----------------
-SOURCE_FILE="dist/source.zip"
+DASK_SOURCE="dist/source.zip"
 DASK_HOST="localhost"
 DASK_PORT=8786
 SLEEP_TIME=30s
@@ -29,9 +29,9 @@ echo "Loading singularity modules..."
 module load cuda-10.2-gcc-8.3.0-nxzzh52 &&
 module load singularity-3.6.2-gcc-8.3.0-quskioo &&
 
-echo "Creating '${SOURCE_FILE}'..."
+echo "Creating '${DASK_SOURCE}'..."
 singularity exec --nv ~/containers/openpose.sif poetry build -f sdist &&
-cp dist/*.whl ${SOURCE_FILE} &&
+cp dist/*.whl ${DASK_SOURCE} &&
 
 
 echo "Initializing scheduler..."
@@ -52,7 +52,6 @@ echo "Waiting ${SLEEP_TIME} for workers to initialize..."
 sleep ${SLEEP_TIME} &&
 
 echo "Running project..."
-# singularity exec --nv ~/containers/openpose.sif poetry run python main.py --config ${CONFIG_FILE} --n_jobs=-1 --source_file=${SOURCE_FILE} &&
-singularity exec --nv ~/containers/openpose.sif poetry run python main.py --config ${CONFIG_FILE} --n_jobs=-1 &&
+singularity exec --nv ~/containers/openpose.sif poetry run python main.py --config ${CONFIG_FILE} --n_jobs=-1 --dask "{ 'host': ${DASK_HOST}, 'port': ${DASK_PORT}, 'source': ${DASK_SOURCE} }" &&
 
 echo "Command finished."

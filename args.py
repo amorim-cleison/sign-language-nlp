@@ -7,7 +7,6 @@ ARGUMENTS = [
     Argument('-cv', '--cv', help='Cross-validator class'),
     Argument('-sc', '--scoring', type=str, help='Scoring metric to use'),
     Argument('-vb', '--verbose', type=int, help='Verbosity level'),
-    Argument('-sf', '--source_file', type=int, help='Source file'),
     Argument('-j', '--n_jobs', type=int, default=1, help='Number of jobs'),
     Argument('-n', '--mode', options=["grid", "train"], help='Mode'),
     Argument('-w', '--workdir', help='Working directory'),
@@ -50,4 +49,5 @@ ARGUMENTS = [
              '--grid_args',
              type=dict,
              help='Options for the grid search'),
+    Argument('-dask', '--dask_args', type=dict, help='Dask configurations', required=True),
 ]

@@ -1,6 +1,7 @@
 import torch
 from commons.log import log
 from commons.util import load_args
+from joblib import parallel_backend
 from sklearn.model_selection import GridSearchCV
 from skorch import NeuralNetClassifier
 
@@ -8,18 +9,6 @@ import helper as h
 from args import ARGUMENTS
 from dataset import AslDataset
 
-import model
-# from model import Transformer
-
-
-# FIXME:
-# from dask.distributed import Client
-from joblib import parallel_backend
-# import os
-# import sys
-# from model import *
-
-# import dasks as dh
 
 def run(args):
     # Seed:
@@ -123,15 +112,18 @@ def test_model(estimator, test_data, scoring, cuda, profile=True, **kwargs):
                                          use_cuda=cuda,
                                          profile_memory=True,
                                          with_flops=True) as prof:
-        # Metrics:
+        # Compute metrics:
         if "accuracy" not in scoring:
             scoring = ["accuracy", *scoring]
-        scorers = h.build_scoring(scoring=scoring, labels=test_data.labels())
-        test_output = {
-            f"test_{scorer.score}": scorer(estimator, test_data.X(),
-                                           test_data.y().to_array())
-            for scorer in scorers
-        }
+
+        with parallel_backend('dask'):
+            scorers = h.build_scoring(scoring=scoring,
+                                      labels=test_data.labels())
+            test_output = {
+                f"test_{scorer.score}": scorer(estimator, test_data.X(),
+                                               test_data.y().to_array())
+                for scorer in scorers
+            }
 
     # Save output:
     h.save_output(test_output, phase=phase, **kwargs)
@@ -145,31 +137,6 @@ def should_balance_dataset(args):
         args["dataset_args"]["balance_dataset"] is True)
 
 
-
-
-
-
-
-
-
-# FIXME
-def init_dask_client():
-    from dask.distributed import Client
-    from commons.util import normpath
-    from dask_cuda import LocalCUDACluster
-
-    log("Initializing dask client...")
-
-    cluster = LocalCUDACluster()
-    client = Client(cluster)
-
-    # client = Client("localhost:8786")
-    client.upload_file(normpath("dist/source.zip"))
-
-    log("Dask client initialized")
-    return client
-
-
 if __name__ == "__main__":
     args = vars(load_args('SL Transformer', ARGUMENTS))
     args["workdir"] = h.format_dir(args["workdir"], **args)
@@ -177,6 +144,6 @@ if __name__ == "__main__":
     # Dump args:
     h.dump_args(args)
 
-    with init_dask_client():
-        # Run:
+    # Run (distributed):
+    with h.create_dask_client(**args):
         run(args)

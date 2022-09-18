@@ -25,8 +25,8 @@ def setup_seed(seed, **kwargs):
 def prepare_device(cuda):
     if torch.cuda.is_available():
         if not cuda:
-            log("WARNING: You have a CUDA device, so you should probably "
-                "run with --cuda")
+            log("WARNING: CUDA device(s) available, so you should "
+                "probably run with --cuda")
 
     return torch.device("cuda" if cuda else "cpu")
 
@@ -106,19 +106,19 @@ def build_net_params(model_args, model, optimizer, criterion, callbacks,
 
 def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
                       verbose, n_jobs, cv, data, **kwargs):
-    def unpack(callbacks_names,
-               model,
-               workdir,
-               scoring,
-               verbose,
-               n_jobs,
-               data,
-               cv,
-               training_args={},
-               model_args={},
-               optimizer_args={},
-               criterion_args={},
-               **kwargs):
+    def __unpack_args(callbacks_names,
+                      model,
+                      workdir,
+                      scoring,
+                      verbose,
+                      n_jobs,
+                      data,
+                      cv,
+                      training_args={},
+                      model_args={},
+                      optimizer_args={},
+                      criterion_args={},
+                      **kwargs):
         # Callbacks args:
         _callbacks_args = build_callbacks_args(model=model,
                                                workdir=workdir,
@@ -168,15 +168,15 @@ def build_grid_params(grid_args, callbacks_names, model, workdir, scoring,
             }
         }
 
-    return unpack(callbacks_names=callbacks_names,
-                  model=model,
-                  workdir=workdir,
-                  scoring=scoring,
-                  verbose=verbose,
-                  n_jobs=n_jobs,
-                  data=data,
-                  cv=cv,
-                  **grid_args)
+    return __unpack_args(callbacks_names=callbacks_names,
+                         model=model,
+                         workdir=workdir,
+                         scoring=scoring,
+                         verbose=verbose,
+                         n_jobs=n_jobs,
+                         data=data,
+                         cv=cv,
+                         **grid_args)
 
 
 def build_test_params(scoring, verbose, n_jobs, cv, data, **kwargs):
@@ -475,6 +475,30 @@ def save_profile(profiler, phase, workdir, **kwargs):
     }
     log(details)
     save_json(details, f"{workdir}/{phase}_profile.json")
+
+
+def create_dask_client(dask_args, **kwargs):
+    log("Initializing Dask client...")
+
+    def __unpack_args(host=None, port=None, source=None, **kwargs):
+        from dask.distributed import Client
+
+        # Create client:
+        if (host and port):
+            client = Client(f"{host:port}")
+        else:
+            client = Client()
+
+        log(f" > Client initialized: {client}")
+
+        # Upload source code:
+        if source:
+            log(f" > Uploading '{source}' to client...")
+            client.upload_file(normpath(source))
+
+        return client
+
+    return __unpack_args(**dask_args)
 
 
 class ScoringWrapper:
