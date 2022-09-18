@@ -485,7 +485,7 @@ def create_dask_client(dask_args, **kwargs):
 
         # Create client:
         if (host and port):
-            client = Client(f"{host:port}")
+            client = Client(f"{host}:{port}")
         else:
             client = Client()
 
