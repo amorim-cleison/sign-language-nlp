@@ -8,6 +8,18 @@ import helper as h
 from args import ARGUMENTS
 from dataset import AslDataset
 
+import model
+# from model import Transformer
+
+
+# FIXME:
+# from dask.distributed import Client
+from joblib import parallel_backend
+# import os
+# import sys
+# from model import *
+
+# import dasks as dh
 
 def run(args):
     # Seed:
@@ -81,7 +93,8 @@ def tune_hyperparams(estimator,
         h.save_param_grid(gs.param_grid, phase=phase, **kwargs)
 
         # Fit:
-        gs.fit(X=train_data.X(), y=train_data.y().to_array())
+        with parallel_backend('dask'):
+            gs.fit(X=train_data.X(), y=train_data.y().to_array())
 
         # Output:
         gs_output = {
@@ -132,6 +145,45 @@ def should_balance_dataset(args):
         args["dataset_args"]["balance_dataset"] is True)
 
 
+
+
+
+
+
+
+
+# FIXME
+def init_dask_client():
+    from dask.distributed import Client
+    import dask_jobqueue
+
+    log("Initializing dask client...")
+
+    cluster = dask_jobqueue.SLURMCluster(
+        n_workers=2,
+        cores=8,                                # cpus-per-task
+        # processes=4,    # 
+        memory="16GB",                          # mem
+        # project="woodshole",
+        walltime="7-00:00:00",
+        queue="long_gpu",
+        job_extra_directives=["--gres=gpu:2"],  # gres
+        silence_logs="debug",
+        # name="TRNSF",
+        job_name="TRNSF",                       # job-name
+        log_directory="./out/"
+    )
+    # cluster.scale(2)
+
+    # debug
+    print(cluster.job_script())
+
+    client = Client(cluster)
+
+    log("Dask client initialized")
+    return client
+
+
 if __name__ == "__main__":
     args = vars(load_args('SL Transformer', ARGUMENTS))
     args["workdir"] = h.format_dir(args["workdir"], **args)
@@ -139,5 +191,6 @@ if __name__ == "__main__":
     # Dump args:
     h.dump_args(args)
 
-    # Run:
-    run(args)
+    with init_dask_client():
+        # Run:
+        run(args)
