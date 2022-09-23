@@ -144,6 +144,9 @@ if __name__ == "__main__":
     # Dump args:
     h.dump_args(args)
 
-    # Run (distributed):
-    with h.create_dask_client(**args):
-        run(args)
+    # Create distributed client:
+    client = h.create_dask_client(**args)
+    log(f" > Client initialized: {client}")
+
+    # Run:
+    run(args)
