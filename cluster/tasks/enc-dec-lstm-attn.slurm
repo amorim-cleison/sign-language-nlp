@@ -5,6 +5,6 @@
 #SBATCH --mem=32G
 #SBATCH --output=enc-dec-lstm-attn.out
 #SBATCH --nodelist=node004
-#SBATCH -p=long_gpu
+#SBATCH --partition=long_gpu
 
 ./../run-task.sh -c config/config-enc-dec-lstm-attn.yaml

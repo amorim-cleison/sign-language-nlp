@@ -5,7 +5,7 @@
 #SBATCH --mem=32G
 #SBATCH --output=enc-dec-gru-attn.out
 #SBATCH --nodelist=node005
-#SBATCH -p=long_gpu
+#SBATCH --partition=long_gpu
 
 ./../run-task.sh -c config/config-enc-dec-gru-attn.yaml
 
