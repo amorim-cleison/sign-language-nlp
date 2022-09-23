@@ -7,7 +7,7 @@ printf 'Deleting cached datasets...\n'
 rm -f /tmp/*.dataset.tmp
 
 printf 'Submitting tasks (with interval)...\n'
-(cd out/ && for FILE in ../tasks/*.slurm; do printf ' %s -> ' "$FILE"; sbatch -p long_gpu $FILE; sleep 5s; done;)
+(cd out/ && for FILE in ../tasks/*.slurm; do printf ' %s -> ' "$FILE"; sbatch $FILE; sleep 5s; done;)
 
 printf '\n'
 ./status-cluster.sh
