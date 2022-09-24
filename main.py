@@ -1,4 +1,3 @@
-import torch
 from commons.log import log
 from commons.util import load_args
 from joblib import parallel_backend
@@ -62,27 +61,23 @@ def tune_hyperparams(estimator,
                      callbacks_names,
                      train_data,
                      cuda,
-                     profile=True,
                      **kwargs):
     log("\n==================== TUNING HYPERPARAMETERS ====================\n")
     phase = "grid_search"
 
-    with torch.autograd.profiler.profile(enabled=profile,
-                                         use_cuda=cuda,
-                                         profile_memory=True,
-                                         with_flops=True) as prof:
-        # Grid search:
-        gs_params = h.build_grid_params(callbacks_names=callbacks_names,
-                                        data=train_data,
-                                        **kwargs)
-        gs = GridSearchCV(estimator=estimator, **gs_params)
-        log(gs_params)
+    # Grid search:
+    gs_params = h.build_grid_params(callbacks_names=callbacks_names,
+                                    data=train_data,
+                                    **kwargs)
+    gs = GridSearchCV(estimator=estimator, **gs_params)
+    log(gs_params)
 
-        # Params grid:
-        h.save_param_grid(gs.param_grid, phase=phase, **kwargs)
+    # Params grid:
+    h.save_param_grid(gs.param_grid, phase=phase, **kwargs)
 
-        # Fit:
-        with parallel_backend('dask'):
+    # Fit:
+    with parallel_backend('dask'):
+        with h.create_profiler(cuda) as prof:
             gs.fit(X=train_data.X(), y=train_data.y().to_array())
 
         # Output:
@@ -93,43 +88,41 @@ def tune_hyperparams(estimator,
             "scoring": str(gs.scoring)
         }
 
-    # Save output:
-    h.save_output(gs_output, phase=phase, **kwargs)
-    h.save_cv_results(gs.cv_results_, phase=phase, **kwargs)
+        # Save output:
+        h.save_output(gs_output, phase=phase, **kwargs)
+        h.save_cv_results(gs.cv_results_, phase=phase, **kwargs)
 
-    # Save profile:
-    h.save_profile(prof, phase=phase, **kwargs)
+        # Save profile:
+        h.save_profile(prof, phase=phase, **kwargs)
 
     # Return best estimator found:
     return gs.best_estimator_
 
 
-def test_model(estimator, test_data, scoring, cuda, profile=True, **kwargs):
+def test_model(estimator, test_data, scoring, cuda, **kwargs):
     log("\n==================== TESTING MODEL ====================\n")
     phase = "test"
 
-    with torch.autograd.profiler.profile(enabled=profile,
-                                         use_cuda=cuda,
-                                         profile_memory=True,
-                                         with_flops=True) as prof:
-        # Compute metrics:
-        if "accuracy" not in scoring:
-            scoring = ["accuracy", *scoring]
+    # Prepare metrics:
+    if "accuracy" not in scoring:
+        scoring = ["accuracy", *scoring]
+    scorers = h.build_scoring(scoring=scoring,
+                              labels=test_data.labels())
 
-        with parallel_backend('dask'):
-            scorers = h.build_scoring(scoring=scoring,
-                                      labels=test_data.labels())
+    # Compute metrics:
+    with parallel_backend('dask'):
+        with h.create_profiler(cuda) as prof:
             test_output = {
                 f"test_{scorer.score}": scorer(estimator, test_data.X(),
                                                test_data.y().to_array())
                 for scorer in scorers
             }
 
-    # Save output:
-    h.save_output(test_output, phase=phase, **kwargs)
+        # Save output:
+        h.save_output(test_output, phase=phase, **kwargs)
 
-    # Save profile:
-    h.save_profile(prof, phase=phase, **kwargs)
+        # Save profile:
+        h.save_profile(prof, phase=phase, **kwargs)
 
 
 def should_balance_dataset(args):

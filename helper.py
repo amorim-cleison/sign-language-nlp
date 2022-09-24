@@ -11,6 +11,7 @@ from sklearn.model_selection import *
 from skorch.callbacks import (Checkpoint, EarlyStopping, EpochScoring,
                               GradientNormClipping, LRScheduler)
 from skorch.dataset import CVSplit
+from torch.profiler import profile
 
 import model.util as util
 from dataset import AslDataset
@@ -387,6 +388,14 @@ def balance_dataset(dataset, seed):
     return dataset_res
 
 
+def create_profiler(cuda):
+    return profile(record_shapes=False,
+                   profile_memory=True,
+                   with_flops=True,
+                   with_stack=False,
+                   with_modules=False)
+
+
 def save_stats_datasets(device, args):
     from collections import Counter
 
@@ -432,18 +441,17 @@ def save_output(output, phase, workdir, **kwargs):
 
 def save_profile(profiler, phase, workdir, **kwargs):
     log("Saving profile...")
+    key_averages = profiler.key_averages()
 
     # Table:
-    table = profiler.key_averages().table(sort_by="self_cpu_time_total",
-                                          top_level_events_only=True)
+    table = key_averages.table(sort_by="self_cpu_time_total",
+                               top_level_events_only=True)
     save_items([table], f"{workdir}/{phase}_profile_table.txt")
 
     # Details:
-    total_average = profiler.total_average()
+    total_average = key_averages.total_average()
     details = {
         # CPU:
-        "cpu_children": total_average.cpu_children,
-        "cpu_parent": total_average.cpu_parent,
         "cpu_memory_usage": total_average.cpu_memory_usage,
         "cpu_time": total_average.cpu_time,
         "cpu_time_str": total_average.cpu_time_str,
@@ -479,6 +487,7 @@ def save_profile(profiler, phase, workdir, **kwargs):
 
 def create_dask_client(dask_args, **kwargs):
     import os
+
     from dask.distributed import Client
 
     log("Initializing Dask client...")
