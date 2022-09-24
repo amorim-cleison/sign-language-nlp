@@ -478,8 +478,10 @@ def save_profile(profiler, phase, workdir, **kwargs):
         "device_type": total_average.device_type.name,
         "count": total_average.count,
         "input_shapes": str(total_average.input_shapes),
-        "stack": str(total_average.stack),
         "scope": str(total_average.scope),
+        "is_legacy": str(total_average.is_legacy),
+        "is_remote": str(total_average.is_remote),
+        "is_async": str(total_average.is_async),
     }
     log(details)
     save_json(details, f"{workdir}/{phase}_profile.json")
