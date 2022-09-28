@@ -19,12 +19,13 @@ validate_param "c" ${CONFIG_FILE}
 # ---------- CODE -----------------
 NODE=${SLURMD_NODENAME}
 CPUS_PER_TASK=${SLURM_CPUS_PER_TASK}
+export DASK_DISTRIBUTED__DIAGNOSTICS__NVML=False
 
 echo "Starting command..."
 cd ../../
 
 echo "Loading singularity modules..."
-module load cuda-10.2-gcc-8.3.0-nxzzh52 &&
+module load cuda-11.0-gcc-8.3.0-fzbvcxy &&
 module load singularity-3.6.2-gcc-8.3.0-quskioo &&
 
 echo "Executing task..."

@@ -57,11 +57,7 @@ def run(args):
     test_model(estimator=best_estimator, test_data=test_data, **args)
 
 
-def tune_hyperparams(estimator,
-                     callbacks_names,
-                     train_data,
-                     cuda,
-                     **kwargs):
+def tune_hyperparams(estimator, callbacks_names, train_data, cuda, **kwargs):
     log("\n==================== TUNING HYPERPARAMETERS ====================\n")
     phase = "grid_search"
 
@@ -77,23 +73,19 @@ def tune_hyperparams(estimator,
 
     # Fit:
     with parallel_backend('dask'):
-        with h.create_profiler(cuda) as prof:
-            gs.fit(X=train_data.X(), y=train_data.y().to_array())
+        gs.fit(X=train_data.X(), y=train_data.y().to_array())
 
-        # Output:
-        gs_output = {
-            "best_score": float(gs.best_score_),
-            "best_params": gs.best_params_,
-            "best_index": int(gs.best_index_),
-            "scoring": str(gs.scoring)
-        }
+    # Output:
+    gs_output = {
+        "best_score": float(gs.best_score_),
+        "best_params": gs.best_params_,
+        "best_index": int(gs.best_index_),
+        "scoring": str(gs.scoring)
+    }
 
-        # Save output:
-        h.save_output(gs_output, phase=phase, **kwargs)
-        h.save_cv_results(gs.cv_results_, phase=phase, **kwargs)
-
-        # Save profile:
-        h.save_profile(prof, phase=phase, **kwargs)
+    # Save output:
+    h.save_output(gs_output, phase=phase, **kwargs)
+    h.save_cv_results(gs.cv_results_, phase=phase, **kwargs)
 
     # Return best estimator found:
     return gs.best_estimator_
@@ -106,23 +98,23 @@ def test_model(estimator, test_data, scoring, cuda, **kwargs):
     # Prepare metrics:
     if "accuracy" not in scoring:
         scoring = ["accuracy", *scoring]
-    scorers = h.build_scoring(scoring=scoring,
-                              labels=test_data.labels())
+    scorers = h.build_scoring(scoring=scoring, labels=test_data.labels())
 
-    # Compute metrics:
     with parallel_backend('dask'):
+        # Compute metrics:
+        test_output = {
+            f"test_{scorer.score}": scorer(estimator, test_data.X(),
+                                           test_data.y().to_array())
+            for scorer in scorers
+        }
+
+        # Profile model:
         with h.create_profiler(cuda) as prof:
-            test_output = {
-                f"test_{scorer.score}": scorer(estimator, test_data.X(),
-                                               test_data.y().to_array())
-                for scorer in scorers
-            }
+            estimator.predict(test_data.X())
 
-        # Save output:
-        h.save_output(test_output, phase=phase, **kwargs)
-
-        # Save profile:
-        h.save_profile(prof, phase=phase, **kwargs)
+    # Save output:
+    h.save_output(test_output, phase=phase, **kwargs)
+    h.save_profile(prof, phase=phase, **kwargs)
 
 
 def should_balance_dataset(args):
