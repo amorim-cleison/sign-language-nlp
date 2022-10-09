@@ -75,6 +75,8 @@ def tune_hyperparams(estimator, callbacks_names, train_data, cuda, **kwargs):
     with parallel_backend('dask'):
         gs.fit(X=train_data.X(), y=train_data.y().to_array())
 
+        # TODO: add something to wait dask to finish
+
     # Output:
     gs_output = {
         "best_score": float(gs.best_score_),
@@ -111,6 +113,8 @@ def test_model(estimator, test_data, scoring, cuda, **kwargs):
         # Profile model:
         with h.create_profiler(cuda) as prof:
             estimator.predict(test_data.X())
+
+        # TODO: add something to wait dask to finish
 
     # Save output:
     h.save_output(test_output, phase=phase, **kwargs)

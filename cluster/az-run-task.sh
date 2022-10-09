@@ -17,9 +17,6 @@ validate_param "c" ${CONFIG_FILE}
 
 
 # ---------- CODE -----------------
-# NODE=${SLURMD_NODENAME}
-# CPUS_PER_TASK=${SLURM_CPUS_PER_TASK}
-# export DASK_DISTRIBUTED__DIAGNOSTICS__NVML=False
 NODE=localhost
 CPUS_PER_TASK=6
 # export DASK_DISTRIBUTED__DIAGNOSTICS__NVML=False
@@ -27,13 +24,8 @@ CPUS_PER_TASK=6
 echo "Starting command..."
 cd ../../
 
-# echo "Loading singularity modules..."
-# module load cuda-11.0-gcc-8.3.0-fzbvcxy &&
-# module load singularity-3.6.2-gcc-8.3.0-quskioo &&
-
 echo "Executing task..."
 echo " > GPUs available: ${CUDA_VISIBLE_DEVICES}"
-# singularity exec --nv ~/containers/openpose.sif poetry run python main.py --config ${CONFIG_FILE} --n_jobs=-1 --dask "{ 'node': '${NODE}', 'cpus_per_task': '${CPUS_PER_TASK}' }" &&
 poetry run python main.py --config ${CONFIG_FILE} --n_jobs=-1 --dask "{ 'node': '${NODE}', 'cpus_per_task': '${CPUS_PER_TASK}' }" &&
 
 echo "Command finished."
