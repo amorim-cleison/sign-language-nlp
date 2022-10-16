@@ -496,11 +496,12 @@ def create_dask_client(dask_args, **kwargs):
 
     # Parameters:
     scheduler = str(dask_args.get("scheduler", None))
+    source = str(dask_args.get("source", None))
     node = str(dask_args.get("node", "localhost"))
     cpus_per_task = int(dask_args.get("cpus_per_task", os.cpu_count()))
 
     if scheduler:
-        return Client(address=scheduler)
+        client = Client(address=scheduler)
     else:
         # FIXME: and linux
         if (torch.cuda.is_available()):
@@ -515,7 +516,14 @@ def create_dask_client(dask_args, **kwargs):
                                    threads_per_worker=cpus_per_task,
                                    processes=False)
 
-        return Client(cluster)
+        client = Client(cluster)
+
+    # Upload source code:
+    if source:
+        log(f" > Uploading '{source}' to client...")
+        client.upload_file(normpath(source))
+
+    return client
 
 
 class ScoringWrapper:
