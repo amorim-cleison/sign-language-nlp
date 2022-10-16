@@ -56,6 +56,6 @@ sleep ${SLEEP_TIME} &&
 
 echo "Executing task..."
 echo " > GPUs available: ${CUDA_VISIBLE_DEVICES}"
-singularity exec --nv ~/containers/openpose.sif poetry run python main.py --config ${CONFIG_FILE} --n_jobs=-1 --dask "{ 'node': '${NODE}', 'cpus_per_task': '${CPUS_PER_TASK}', 'host': '${DASK_HOST}', 'port': '${DASK_PORT}', 'source': '${DASK_SOURCE}' }" &&
+singularity exec --nv ~/containers/openpose.sif poetry run python main.py --config ${CONFIG_FILE} --n_jobs=-1 --dask "{ 'node': '${NODE}', 'cpus_per_task': '${CPUS_PER_TASK}', 'scheduler': '${DASK_HOST}:${DASK_PORT}', 'source': '${DASK_SOURCE}' }" &&
 
 echo "Command finished."
