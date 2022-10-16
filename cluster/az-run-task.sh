@@ -18,8 +18,7 @@ validate_param "c" ${CONFIG_FILE}
 
 # ---------- CODE -----------------
 NODE=localhost
-CPUS_PER_TASK=6
-# export DASK_DISTRIBUTED__DIAGNOSTICS__NVML=False
+CPUS_PER_TASK=3
 
 echo "Starting command..."
 cd ../../
