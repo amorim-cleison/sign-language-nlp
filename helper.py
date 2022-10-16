@@ -495,8 +495,8 @@ def create_dask_client(dask_args, **kwargs):
     log("Initializing Dask client...")
 
     # Parameters:
-    scheduler = str(dask_args.get("scheduler", None))
-    source = str(dask_args.get("source", None))
+    scheduler = str(dask_args.get("scheduler", ""))
+    source = str(dask_args.get("source", ""))
     node = str(dask_args.get("node", "localhost"))
     cpus_per_task = int(dask_args.get("cpus_per_task", os.cpu_count()))
 
