@@ -48,6 +48,8 @@ def run(args):
     test_data, train_data = dataset.split(lengths=test_size,
                                           indices_only=False,
                                           seed=seed)
+    log(f"> Train data: {len(train_data)} entries")
+    log(f"> Test data: {len(test_data)} entries")
 
     # Tune hyperparams and test model:
     best_estimator = tune_hyperparams(estimator=net,

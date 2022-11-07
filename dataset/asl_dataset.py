@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from skorch.helper import SliceDataset
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Subset
 
 from dataset.builder import DatasetBuilder
 
@@ -31,6 +31,19 @@ class AslDataset(Dataset):
                 X, y = dataset.__data
             elif isinstance(X, Dataset):
                 X, y = zip(*X)
+
+        elif isinstance(dataset, Subset):
+            _subset = dataset
+            _X, _y = zip(*(_subset.dataset[i] for i in _subset.indices))
+            self.__init__(dataset=_subset.dataset,
+                          X=_X,
+                          y=_y,
+                          batch_first=batch_first,
+                          dataset_args=dataset_args,
+                          device=device,
+                          vocab_fmt=vocab_fmt,
+                          **kwargs)
+            return
 
         elif isinstance(X, SliceDataset) or isinstance(y, SliceDataset):
             if isinstance(X, SliceDataset):
@@ -234,7 +247,7 @@ class AslDataset(Dataset):
             if indices_only:
                 item = split.indices
             else:
-                item = AslDataset(dataset=self, data=split)
+                item = AslDataset(dataset=split)
             return item
 
         return [get_item(s, indices_only) for s in splits]
