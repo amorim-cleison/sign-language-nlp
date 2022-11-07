@@ -1,7 +1,7 @@
 SCHEDULER="20.165.54.123:5696"
 DASK_SOURCE="dist/source.zip"
 THREADS=3
-IP=$(hostname)
+NAME=$(hostname)
 export DASK_DISTRIBUTED__DIAGNOSTICS__NVML=False
 
 
