@@ -9,7 +9,7 @@ cd ~/repos/sign-language-nlp/
 
 
 echo "Creating '${DASK_SOURCE}'..."
-singularity exec --nv ~/containers/openpose.sif poetry build -f sdist &&
+poetry build -f sdist &&
 cp dist/*.whl ${DASK_SOURCE} &&
 
 
