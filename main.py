@@ -1,7 +1,7 @@
-import pandas as pd
 from commons.log import log
-from commons.util import load_args, save_json
-from sklearn.model_selection import GridSearchCV, cross_val_score
+from commons.util import load_args
+from joblib import parallel_backend
+from sklearn.model_selection import GridSearchCV
 from skorch import NeuralNetClassifier
 
 import helper as h
@@ -11,27 +11,29 @@ from dataset import AslDataset
 
 def run(args):
     # Seed:
-    h.setup_seed(**args)
+    seed = args["seed"]
+    h.setup_seed(seed)
 
     # Device:
-    device = h.prepare_device(args["cuda"])
+    cuda = args["cuda"]
+    device = h.prepare_device(cuda)
 
     # Dataset:
+    if args["debug"]:
+        args["dataset_args"]["reuse_transient"] = True
     # h.save_stats_datasets(device, args)
     dataset = AslDataset(device=device, batch_first=True, **args).stoi()
 
     if args["debug"]:
-        dataset = dataset.truncated(1000)
+        dataset = dataset.truncated(args["cv"] * 10)
 
     # Balance dataset:
     if should_balance_dataset(args):
-        dataset = h.balance_dataset(dataset=dataset, seed=args["seed"])
+        dataset = h.balance_dataset(dataset=dataset, seed=seed)
     log(f"{len(dataset)} entries of data")
 
     # Callbacks:
-    callbacks, callbacks_names = h.build_callbacks(dataset=dataset,
-                                                   **args,
-                                                   **args["training_args"])
+    callbacks, callbacks_names = h.build_callbacks(dataset=dataset, **args)
 
     # Classifier:
     net_params = h.build_net_params(callbacks=callbacks,
@@ -41,45 +43,41 @@ def run(args):
                                     **args)
     net = NeuralNetClassifier(**net_params)
 
-    # Train:
-    if args["mode"] == "train":
-        run_training(net=net, dataset=dataset, **args, **args["training_args"])
+    # Split data:
+    test_size = args["test_size"]
+    test_data, train_data = dataset.split(lengths=test_size,
+                                          indices_only=False,
+                                          seed=seed)
+    log(f"> Train data: {len(train_data)} entries")
+    log(f"> Test data: {len(test_data)} entries")
+
+    # Tune hyperparams and test model:
+    best_estimator = tune_hyperparams(estimator=net,
+                                      callbacks_names=callbacks_names,
+                                      train_data=train_data,
+                                      **args)
+    test_model(estimator=best_estimator, test_data=test_data, **args)
+
+
+def tune_hyperparams(estimator, callbacks_names, train_data, cuda, **kwargs):
+    log("\n==================== TUNING HYPERPARAMETERS ====================\n")
+    phase = "grid_search"
 
     # Grid search:
-    elif args["mode"] == "grid":
-        run_grid_search(net=net,
-                        callbacks_names=callbacks_names,
-                        dataset=dataset,
-                        **args)
+    gs_params = h.build_grid_params(callbacks_names=callbacks_names,
+                                    data=train_data,
+                                    **kwargs)
+    gs = GridSearchCV(estimator=estimator, **gs_params)
+    log(gs_params)
 
-
-def run_training(net, dataset, test_size, **kwargs):
-    log("Training...")
-
-    test, train = dataset.split(test_size, indices_only=False)
+    # Params grid:
+    h.save_param_grid(gs.param_grid, phase=phase, **kwargs)
 
     # Fit:
-    net.fit(train, train.y().cpu())
+    with parallel_backend('dask'):
+        gs.fit(X=train_data.X(), y=train_data.y().to_array())
 
-    # Score:
-    score = net.score(test, test.y().cpu())
-    log(f"Test score: {score:.4f}")
-
-
-def run_grid_search(net, callbacks_names, dataset, **kwargs):
-    log("Grid search...")
-
-    # Grid search:
-    grid_params = h.build_grid_params(callbacks_names=callbacks_names,
-                                      dataset=dataset,
-                                      **kwargs)
-    gs = GridSearchCV(net, **grid_params)
-    log(gs)
-
-    # FIXME: add support to RandomizedSearchCV
-
-    # Fit:
-    gs.fit(dataset.X(), dataset.y())
+        # TODO: add something to wait dask to finish
 
     # Output:
     gs_output = {
@@ -88,13 +86,41 @@ def run_grid_search(net, callbacks_names, dataset, **kwargs):
         "best_index": int(gs.best_index_),
         "scoring": str(gs.scoring)
     }
-    log(gs_output)
 
     # Save output:
-    log("Saving grid search output...")
-    save_json(data=gs_output, path=f"{args['workdir']}/grid_search.json")
-    pd.DataFrame(
-        gs.cv_results_).to_csv(f"{args['workdir']}/grid_search_results.csv")
+    h.save_output(gs_output, phase=phase, **kwargs)
+    h.save_cv_results(gs.cv_results_, phase=phase, **kwargs)
+
+    # Return best estimator found:
+    return gs.best_estimator_
+
+
+def test_model(estimator, test_data, scoring, cuda, **kwargs):
+    log("\n==================== TESTING MODEL ====================\n")
+    phase = "test"
+
+    # Prepare metrics:
+    if "accuracy" not in scoring:
+        scoring = ["accuracy", *scoring]
+    scorers = h.build_scoring(scoring=scoring, labels=test_data.labels())
+
+    with parallel_backend('dask'):
+        # Compute metrics:
+        test_output = {
+            f"test_{scorer.score}": scorer(estimator, test_data.X(),
+                                           test_data.y().to_array())
+            for scorer in scorers
+        }
+
+        # Profile model:
+        with h.create_profiler(cuda) as prof:
+            estimator.predict(test_data.X())
+
+        # TODO: add something to wait dask to finish
+
+    # Save output:
+    h.save_output(test_output, phase=phase, **kwargs)
+    h.save_profile(prof, phase=phase, **kwargs)
 
 
 def should_balance_dataset(args):
@@ -108,6 +134,10 @@ if __name__ == "__main__":
 
     # Dump args:
     h.dump_args(args)
+
+    # Create distributed client:
+    client = h.create_dask_client(**args)
+    log(f" > Client initialized: {client}")
 
     # Run:
     run(args)

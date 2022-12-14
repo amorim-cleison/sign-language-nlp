@@ -5,102 +5,56 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run Main",
+            "name": "Debug",
             "type": "python",
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-lstm.yaml", "--debug", "False", "--cuda", "False"]
-        },
-
-        // GRID SEARCH:
-        {
-            "name": "Grid - Transformer",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-grid-transformer.yaml", "--cuda", "False", "--debug", "False", "--n_jobs", "-1"]
-        },
-        {
-            "name": "Grid - Enc-Dec GRU Attn",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-grid-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "False", "--n_jobs", "7"]
+            "args": [
+                "-c",
+                "config/config-transformer.yaml",
+                "--cuda",
+                "False",
+                "--debug",
+                "True",
+                "--max_epochs",
+                "5",
+                "--n_jobs",
+                "3",
+                "--grid_args",
+                "{ 'lr': [0.1], 'model_args': { 'embedding_size': [128], 'hidden_size': [256], 'num_layers': [2], 'dropout': [0.1], 'num_heads': [4] }}",
+                "--dask",
+                "{ }"
+            ]
         },
         {
-            "name": "Grid - Enc-Dec LSTM Attn",
+            "name": "Transformer",
             "type": "python",
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-grid-enc-dec-lstm-attn.yaml", "--cuda", "False", "--debug", "False", "--n_jobs", "-1"]
-        },
-
-        // TRAINING:
-        {
-            "name": "Train - Transformer",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-train-transformer.yaml", "--cuda", "False", "--debug", "False"]
+            "args": ["-c", "config/config-transformer.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "3"]
         },
         {
-            "name": "Train - Enc-Dec GRU Attn",
+            "name": "Enc-Dec GRU Attn",
             "type": "python",
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-train-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "False"]
+            "args": ["-c", "config/config-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "3"]
         },
         {
-            "name": "Train - Enc-Dec LSTM Attn",
+            "name": "Enc-Dec LSTM Attn",
             "type": "python",
             "request": "launch",
             "module": "main",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["-c", "config/config-train-enc-dec-lstm-attn.yaml", "--cuda", "False", "--debug", "False"]
-        },
-       
-
-        // (DEBUG) TRAINING
-        {
-            "name": "(Debug) Train - Transformer",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-train-transformer.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "2"]
-        },
-        {
-            "name": "(Debug) Train - Enc-Dec GRU Attn",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-train-enc-dec-gru-attn.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "2"]
-        },
-        {
-            "name": "(Debug) Train - Enc-Dec LSTM Attn",
-            "type": "python",
-            "request": "launch",
-            "module": "main",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": ["-c", "config/config-train-enc-dec-lstm-attn.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "2"]
-        },
+            "args": ["-c", "config/config-enc-dec-lstm-attn.yaml", "--cuda", "False", "--debug", "True", "--n_jobs", "3"]
+        }, 
 
         // (DEBUG) Out
         {

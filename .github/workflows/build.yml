@@ -48,9 +48,9 @@ jobs:
       with:
         poetry-version: ${{ matrix.poetry-version }}
 
-    - name: Configure Poetry
-      shell: bash
-      run: poetry config virtualenvs.in-project true
+    # - name: Configure Poetry
+    #   shell: bash
+    #   run: poetry config virtualenvs.in-project true
 
     - name: Set up cache
       uses: actions/cache@v2

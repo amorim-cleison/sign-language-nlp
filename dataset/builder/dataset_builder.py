@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from commons.log import auto_log_progress, log
 from commons.util import (exists, filename, filter_files, read_json,
-                          save_items, get_hash, delete_file)
+                          save_items, get_hash)
 from dataset.constant import PAD_WORD, UNK_WORD, EOS_WORD, BOS_WORD
 from torchtext.data import Field, TabularDataset, interleave_keys
 
@@ -25,24 +25,26 @@ class DatasetBuilder():
               **kwargs):
         log("Loading dataset...")
 
-        # Temp name:
-        _name = get_hash({
-            "dir": dataset_dir,
-            "fields": fields,
-            "min_freq": samples_min_freq,
-            "strategy": composition_strategy
-        })
-        path = normpath(f"{tempfile.gettempdir()}/{_name}.tmp")
-
-        # Should reuse transient file?
-        if (not reuse_transient) and exists(path):
-            delete_file(path)
-
-        # Write transient working file:
-        if exists(path):
-            log(f"Reusing working data file found at '{path}'...")
+        # Should reuse or create an exclusive one:
+        if (reuse_transient):
+            _name = get_hash({
+                "dir": dataset_dir,
+                "fields": fields,
+                "min_freq": samples_min_freq,
+                "strategy": composition_strategy
+            })
         else:
-            log("Creating working data file...")
+            _name = next(tempfile._get_candidate_names())
+
+        # Temp name:
+        path = normpath(
+            f"{tempfile.gettempdir()}/{_name}.dataset.tmp"
+        )
+
+        if exists(path):
+            log(f"Reusing data file found at '{path}'...")
+        else:
+            log(f"Creating data file at '{path}'...")
             self.write_working_file(path=path,
                                     dataset_dir=dataset_dir,
                                     min_freq=samples_min_freq)
@@ -96,24 +98,24 @@ class DatasetBuilder():
 
         # Fields:
         SRC = Field(pad_token=PAD_WORD,
-                    unk_token=UNK_WORD,
-                    preprocessing=preprocess_src,
-                    include_lengths=True,
-                    batch_first=batch_first,
-                    # lower=True,
-                    init_token=None,
-                    # eos_token=EOS_WORD
-                    )
+            unk_token=UNK_WORD,
+            preprocessing=preprocess_src,
+            include_lengths=True,
+            batch_first=batch_first,
+            # lower=True,
+            init_token=None,
+            # eos_token=EOS_WORD
+        )
         TGT = Field(is_target=True,
-                    pad_first=True,
-                    pad_token=PAD_WORD,
-                    batch_first=batch_first,
-                    # lower=True,
-                    # include_lengths=True,
-                    unk_token=UNK_WORD,
-                    # init_token=BOS_WORD,
-                    # eos_token=EOS_WORD
-                    )
+            pad_first=True,
+            pad_token=PAD_WORD,
+            batch_first=batch_first,
+            # lower=True,
+            # include_lengths=True,
+            unk_token=UNK_WORD,
+            # init_token=BOS_WORD,
+            # eos_token=EOS_WORD
+        )
         FILE = Field(batch_first=batch_first)
 
         # Dataset:
