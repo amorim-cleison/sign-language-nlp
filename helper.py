@@ -10,7 +10,7 @@ from commons.util import (create_if_missing, normpath, save_args, save_items,
 from sklearn.model_selection import *
 from skorch.callbacks import (Checkpoint, EarlyStopping, EpochScoring,
                               GradientNormClipping, LRScheduler)
-from skorch.dataset import CVSplit
+from skorch.dataset import ValidSplit
 from torch.profiler import profile
 
 import model.util as util
@@ -319,7 +319,7 @@ def filter_by_keys(map, keys_to_filter, not_in=False):
 
 
 def is_cv_for_net(cross_validator):
-    return isinstance(cross_validator, (int, float, CVSplit))
+    return isinstance(cross_validator, (int, float, ValidSplit))
 
 
 def prefix_args(prefix, ensure_list=False, output=None, **kwargs):
